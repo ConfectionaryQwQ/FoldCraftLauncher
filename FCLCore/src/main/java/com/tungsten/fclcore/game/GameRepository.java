@@ -1,15 +1,32 @@
+/*
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 package com.tungsten.fclcore.game;
 
-import com.tungsten.fclauncher.FCLPath;
+import com.tungsten.fclauncher.utils.FCLPath;
 import com.tungsten.fclcore.task.Task;
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.List;
+import java.util.LinkedHashSet;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Supports operations on versioning.
@@ -175,7 +192,7 @@ public interface GameRepository extends VersionProvider {
      * @param version the id of specific version that is relevant to {@code assetId}
      * @param assetId the asset id, you can find it in {@link AssetIndexInfo#getId()} {@link Version#getAssetIndex()}
      * @param name the asset object name, you can find it in keys of {@link AssetIndex#getObjects()}
-     * @throws IOException if I/O operation fails.
+     * @throws java.io.IOException if I/O operation fails.
      * @return the file that given asset object refers to
      */
     Optional<Path> getAssetObject(String version, String assetId, String name) throws IOException;
@@ -217,13 +234,9 @@ public interface GameRepository extends VersionProvider {
      */
     Path getLoggingObject(String version, String assetId, LoggingInfo loggingInfo);
 
-    default List<String> getClasspath(Version version) {
-        List<String> classpath = new ArrayList<>();
-        if (version.getMinimumLauncherVersion() >= 21) {
-            classpath.add(FCLPath.LWJGL3_DIR + "/lwjgl.jar");
-        } else {
-            classpath.add(FCLPath.LWJGL2_DIR + "/lwjgl.jar");
-        }
+    default Set<String> getClasspath(Version version) {
+        Set<String> classpath = new LinkedHashSet<>();
+        classpath.add(FCLPath.LWJGL_DIR + "/lwjgl.jar");
         for (Library library : version.getLibraries())
             if (library.appliesToCurrentEnvironment() && !library.isNative()) {
                 File f = getLibraryFile(version, library);

@@ -95,9 +95,9 @@ public class InstallerListPage extends FCLCommonPage implements ManageUI.Version
 
             clear();
 
-            InstallerItem.InstallerItemGroup group = new InstallerItem.InstallerItemGroup(getContext());
+            InstallerItem.InstallerItemGroup group = new InstallerItem.InstallerItemGroup(getContext(), gameVersion);
 
-            // Conventional libraries: game, fabric, quilt, forge, liteloader, optifine
+            // Conventional libraries: game, fabric, quilt, forge, neoforge, liteloader, optifine
             for (InstallerItem installerItem : group.getLibraries()) {
                 String libraryId = installerItem.getLibraryId();
                 String libraryVersion = analyzer.getVersion(libraryId).orElse(null);
@@ -176,7 +176,7 @@ public class InstallerListPage extends FCLCommonPage implements ManageUI.Version
                 });
             }
         });
-        TaskDialog dialog = new TaskDialog(getContext(), TaskCancellationAction.NO_CANCEL);
+        TaskDialog dialog = new TaskDialog(getContext(), TaskCancellationAction.NORMAL);
         dialog.setTitle(getContext().getString(R.string.install_installer_install_offline));
         dialog.setExecutor(executor);
         dialog.show();

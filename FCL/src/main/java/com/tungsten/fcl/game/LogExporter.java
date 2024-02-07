@@ -1,3 +1,20 @@
+/*
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 package com.tungsten.fcl.game;
 
 import com.tungsten.fclcore.game.DefaultGameRepository;
@@ -41,12 +58,17 @@ public final class LogExporter {
 
         return CompletableFuture.runAsync(() -> {
             try (Zipper zipper = new Zipper(zipFile)) {
-                if (Files.exists(runDirectory.resolve("logs").resolve("debug.log"))) {
-                    zipper.putFile(runDirectory.resolve("logs").resolve("debug.log"), "debug.log");
+                Path logsDir = runDirectory.resolve("logs");
+                if (Files.exists(logsDir.resolve("debug.log"))) {
+                    zipper.putFile(logsDir.resolve("debug.log"), "debug.log");
                 }
-                if (Files.exists(runDirectory.resolve("logs").resolve("latest.log"))) {
-                    zipper.putFile(runDirectory.resolve("logs").resolve("latest.log"), "latest.log");
+                if (Files.exists(logsDir.resolve("latest.log"))) {
+                    zipper.putFile(logsDir.resolve("latest.log"), "latest.log");
                 }
+                if (Files.exists(logsDir.resolve("fml-client-latest.log"))) {
+                    zipper.putFile(logsDir.resolve("fml-client-latest.log"), "fml-client-latest.log");
+                }
+
                 zipper.putTextFile(Logging.getLogs(), "fcl.log");
                 zipper.putTextFile(logs, "minecraft.log");
 

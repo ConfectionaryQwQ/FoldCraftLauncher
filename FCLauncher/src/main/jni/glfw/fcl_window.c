@@ -258,6 +258,18 @@ static void processEvent(FCLEvent *event)
             return;
         }
 
+        case KeyChar:
+        {
+            const int keychar = event->keychar;
+            const int mods = translateState(event->state);
+            const int plain = !(mods & (GLFW_MOD_CONTROL | GLFW_MOD_ALT));
+
+            if (keychar) {
+                _glfwInputChar(window, keychar, mods, plain);
+            }
+            return;
+        }
+
         case ConfigureNotify:
         {
             const int width = event->width;
@@ -332,6 +344,15 @@ int _glfwPlatformCreateWindow(_GLFWwindow* window,
         }
         else if (ctxconfig->source == GLFW_OSMESA_CONTEXT_API)
         {
+            const char *renderer = getenv("LIBGL_STRING");
+            if (strcmp(renderer, "VirGLRenderer") == 0) {
+                if (!_glfwInitEGL())
+                    return GLFW_FALSE;
+            }
+            if (strcmp(renderer, "Zink") == 0) {
+                if (!_glfwInitEGL())
+                    return GLFW_FALSE;
+            }
             if (!_glfwInitOSMesa())
                 return GLFW_FALSE;
             if (!_glfwCreateContextOSMesa(window, ctxconfig, fbconfig))

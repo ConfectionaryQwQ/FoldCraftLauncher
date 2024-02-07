@@ -1,3 +1,20 @@
+/*
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 package com.tungsten.fclcore.game;
 
 import com.google.gson.JsonDeserializationContext;
@@ -44,7 +61,7 @@ public final class Artifact {
         String fileName = this.name + "-" + this.version;
         if (classifier != null) fileName += "-" + this.classifier;
         this.fileName = fileName + "." + this.extension;
-        this.path = String.format("%s/%s/%s/%s", this.group.replace(".", "/"), this.name, this.version, this.fileName);
+        this.path = String.format("%s/%s/%s/%s", this.group.replace('.', '/'), this.name, this.version, this.fileName);
 
         // group:name:version:classifier@extension
         String descriptor = String.format("%s:%s:%s", group, name, version);
@@ -68,7 +85,7 @@ public final class Artifact {
             throw new IllegalArgumentException("Artifact name is malformed");
         }
 
-        return new Artifact(arr[0].replace("\\", "/"), arr[1], arr[2], arr.length >= 4 ? arr[3] : null, ext);
+        return new Artifact(arr[0].replace('\\', '/'), arr[1], arr[2], arr.length >= 4 ? arr[3] : null, ext);
     }
 
     public String getGroup() {

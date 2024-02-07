@@ -1,9 +1,26 @@
+/*
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 package com.tungsten.fcl.setting;
 
 import com.google.gson.*;
 import com.google.gson.annotations.JsonAdapter;
 import com.tungsten.fclauncher.FCLConfig;
-import com.tungsten.fclauncher.FCLPath;
+import com.tungsten.fclauncher.utils.FCLPath;
 import com.tungsten.fclcore.fakefx.beans.InvalidationListener;
 import com.tungsten.fclcore.fakefx.beans.property.BooleanProperty;
 import com.tungsten.fclcore.fakefx.beans.property.DoubleProperty;
@@ -16,7 +33,6 @@ import com.tungsten.fclcore.fakefx.beans.property.SimpleObjectProperty;
 import com.tungsten.fclcore.fakefx.beans.property.SimpleStringProperty;
 import com.tungsten.fclcore.fakefx.beans.property.StringProperty;
 import com.tungsten.fclcore.game.JavaVersion;
-import com.tungsten.fclcore.game.ProcessPriority;
 import com.tungsten.fclcore.game.Version;
 import com.tungsten.fclcore.task.Schedulers;
 import com.tungsten.fclcore.task.Task;
@@ -63,20 +79,17 @@ public final class VersionSetting implements Cloneable {
 
     // java
 
-    private final ObjectProperty<Integer> javaProperty = new SimpleObjectProperty<>(this, "java", 0);
+    private final StringProperty javaProperty = new SimpleStringProperty(this, "java", JavaVersion.JAVA_AUTO.getVersionName());
 
-    public ObjectProperty<Integer> javaProperty() {
+    public StringProperty javaProperty() {
         return javaProperty;
     }
 
-    /**
-     * Java version or "Custom" if user customizes java directory, "Default" if the jvm that this app relies on.
-     */
-    public int getJava() {
+    public String getJava() {
         return javaProperty.get();
     }
 
-    public void setJava(int java) {
+    public void setJava(String java) {
         javaProperty.set(java);
     }
 
@@ -297,20 +310,6 @@ public final class VersionSetting implements Cloneable {
         controllerProperty.set(controller);
     }
 
-    private final ObjectProperty<ProcessPriority> processPriorityProperty = new SimpleObjectProperty<>(this, "processPriority", ProcessPriority.NORMAL);
-
-    public ObjectProperty<ProcessPriority> processPriorityProperty() {
-        return processPriorityProperty;
-    }
-
-    public ProcessPriority getProcessPriority() {
-        return processPriorityProperty.get();
-    }
-
-    public void setProcessPriority(ProcessPriority processPriority) {
-        processPriorityProperty.set(processPriority);
-    }
-
     private final ObjectProperty<FCLConfig.Renderer> rendererProperty = new SimpleObjectProperty<>(this, "render", FCLConfig.Renderer.RENDERER_GL4ES);
 
     public ObjectProperty<FCLConfig.Renderer> rendererProperty() {
@@ -329,14 +328,18 @@ public final class VersionSetting implements Cloneable {
 
     public Task<JavaVersion> getJavaVersion(Version version) {
         return Task.runAsync(Schedulers.androidUIThread(), () -> {
-            if (getJava() != 0 && getJava() != 1 && getJava() != 2) {
-                setJava(0);
+            if (!getJava().equals(JavaVersion.JAVA_AUTO.getVersionName()) &&
+                    !getJava().equals(JavaVersion.JAVA_8.getVersionName()) &&
+                    !getJava().equals(JavaVersion.JAVA_11.getVersionName()) &&
+                    !getJava().equals(JavaVersion.JAVA_17.getVersionName()) &&
+                    !getJava().equals(JavaVersion.JAVA_21.getVersionName())) {
+                setJava(JavaVersion.JAVA_AUTO.getVersionName());
             }
         }).thenSupplyAsync(() -> {
-            if (getJava() == 0) {
+            if (getJava().equals(JavaVersion.JAVA_AUTO.getVersionName())) {
                 return JavaVersion.getSuitableJavaVersion(version);
             } else {
-                return JavaVersion.getJavaFromId(getJava());
+                return JavaVersion.getJavaFromVersionName(getJava());
             }
         });
     }
@@ -368,7 +371,6 @@ public final class VersionSetting implements Cloneable {
         isolateGameDirProperty.addListener(listener);
         beGestureProperty.addListener(listener);
         controllerProperty.addListener(listener);
-        processPriorityProperty.addListener(listener);
         rendererProperty.addListener(listener);
     }
 
@@ -390,7 +392,6 @@ public final class VersionSetting implements Cloneable {
         versionSetting.setIsolateGameDir(isIsolateGameDir());
         versionSetting.setBeGesture(isBeGesture());
         versionSetting.setController(getController());
-        versionSetting.setProcessPriority(getProcessPriority());
         versionSetting.setRenderer(getRenderer());
         return versionSetting;
     }
@@ -415,7 +416,6 @@ public final class VersionSetting implements Cloneable {
             obj.addProperty("notCheckJVM", src.isNotCheckJVM());
             obj.addProperty("beGesture", src.isBeGesture());
             obj.addProperty("controller", src.getController());
-            obj.addProperty("processPriority", src.getProcessPriority().ordinal());
             obj.addProperty("renderer", src.getRenderer().ordinal());
             obj.addProperty("isolateGameDir", src.isIsolateGameDir());
 
@@ -441,13 +441,12 @@ public final class VersionSetting implements Cloneable {
             vs.setAutoMemory(Optional.ofNullable(obj.get("autoMemory")).map(JsonElement::getAsBoolean).orElse(true));
             vs.setPermSize(Optional.ofNullable(obj.get("permSize")).map(JsonElement::getAsString).orElse(""));
             vs.setServerIp(Optional.ofNullable(obj.get("serverIp")).map(JsonElement::getAsString).orElse(""));
-            vs.setJava(Optional.ofNullable(obj.get("java")).map(JsonElement::getAsInt).orElse(0));
+            vs.setJava(Optional.ofNullable(obj.get("java")).map(JsonElement::getAsString).orElse(JavaVersion.JAVA_AUTO.getVersionName()));
             vs.setScaleFactor(Optional.ofNullable(obj.get("scaleFactor")).map(JsonElement::getAsDouble).orElse(1d));
             vs.setNotCheckGame(Optional.ofNullable(obj.get("notCheckGame")).map(JsonElement::getAsBoolean).orElse(false));
             vs.setNotCheckJVM(Optional.ofNullable(obj.get("notCheckJVM")).map(JsonElement::getAsBoolean).orElse(false));
             vs.setBeGesture(Optional.ofNullable(obj.get("beGesture")).map(JsonElement::getAsBoolean).orElse(false));
             vs.setController(Optional.ofNullable(obj.get("controller")).map(JsonElement::getAsString).orElse("Default"));
-            vs.setProcessPriority(ProcessPriority.values()[Optional.ofNullable(obj.get("processPriority")).map(JsonElement::getAsInt).orElse(ProcessPriority.NORMAL.ordinal())]);
             vs.setRenderer(FCLConfig.Renderer.values()[Optional.ofNullable(obj.get("renderer")).map(JsonElement::getAsInt).orElse(FCLConfig.Renderer.RENDERER_GL4ES.ordinal())]);
             vs.setIsolateGameDir(Optional.ofNullable(obj.get("isolateGameDir")).map(JsonElement::getAsBoolean).orElse(false));
 

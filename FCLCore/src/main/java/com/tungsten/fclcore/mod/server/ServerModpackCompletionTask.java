@@ -1,7 +1,21 @@
+/*
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 package com.tungsten.fclcore.mod.server;
-
-import static com.tungsten.fclcore.util.DigestUtils.digest;
-import static com.tungsten.fclcore.util.Hex.encodeHex;
 
 import com.google.gson.JsonParseException;
 import com.google.gson.reflect.TypeToken;
@@ -12,6 +26,7 @@ import com.tungsten.fclcore.mod.ModpackConfiguration;
 import com.tungsten.fclcore.task.FileDownloadTask;
 import com.tungsten.fclcore.task.GetTask;
 import com.tungsten.fclcore.task.Task;
+import com.tungsten.fclcore.util.DigestUtils;
 import com.tungsten.fclcore.util.Logging;
 import com.tungsten.fclcore.util.StringUtils;
 import com.tungsten.fclcore.util.gson.JsonUtils;
@@ -132,7 +147,7 @@ public class ServerModpackCompletionTask extends Task<Void> {
                 download = true;
             } else {
                 // If user modified this entry file, we will not replace this file since this modified file is that user expects.
-                String fileHash = encodeHex(digest("SHA-1", actualPath));
+                String fileHash = DigestUtils.digestToString("SHA-1", actualPath);
                 String oldHash = files.get(file.getPath()).getHash();
                 download = !Objects.equals(oldHash, file.getHash()) && Objects.equals(oldHash, fileHash);
             }

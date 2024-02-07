@@ -67,7 +67,7 @@ public class InstallersPage extends FCLTempPage implements View.OnClickListener 
     }
 
     public void onCreate(String gameVersion) {
-        group = new InstallerItem.InstallerItemGroup(getContext());
+        group = new InstallerItem.InstallerItemGroup(getContext(), gameVersion);
         nameBar = findViewById(R.id.name_bar);
 
         ColorStateList colorStateList = new ColorStateList(new int[][]{ { } }, new int[]{ ThemeEngine.getInstance().getTheme().getLtColor() });
@@ -89,7 +89,7 @@ public class InstallersPage extends FCLTempPage implements View.OnClickListener 
             String libraryId = library.getLibraryId();
             if (libraryId.equals("game")) continue;
             library.action.set(() -> {
-                if ("fabric-api".equals(libraryId)) {
+                if (LibraryAnalyzer.LibraryType.FABRIC_API.getPatchId().equals(libraryId)) {
                     FCLAlertDialog.Builder builder = new FCLAlertDialog.Builder(getContext());
                     builder.setCancelable(false);
                     builder.setAlertLevel(FCLAlertDialog.AlertLevel.ALERT);

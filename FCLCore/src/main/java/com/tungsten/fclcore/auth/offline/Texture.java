@@ -1,11 +1,24 @@
+/*
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 package com.tungsten.fclcore.auth.offline;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.math.BigInteger;
-import java.net.URL;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
@@ -16,29 +29,23 @@ import static java.util.Objects.requireNonNull;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 
-public class Texture {
+import com.tungsten.fclcore.util.Hex;
+
+public final class Texture {
     private final String hash;
-    private final byte[] data;
+    private final Bitmap image;
 
-    public Texture(String hash, byte[] data) {
+    public Texture(String hash, Bitmap image) {
         this.hash = requireNonNull(hash);
-        this.data = requireNonNull(data);
-    }
-
-    public byte[] getData() {
-        return data;
+        this.image = requireNonNull(image);
     }
 
     public String getHash() {
         return hash;
     }
 
-    public InputStream getInputStream() {
-        return new ByteArrayInputStream(data);
-    }
-
-    public int getLength() {
-        return data.length;
+    public Bitmap getImage() {
+        return image;
     }
 
     private static final Map<String, Texture> textures = new HashMap<>();
@@ -58,8 +65,9 @@ public class Texture {
         } catch (NoSuchAlgorithmException e) {
             throw new RuntimeException(e);
         }
-        int width = img.getWidth();
-        int height = img.getHeight();
+
+        int width = (int) img.getWidth();
+        int height = (int) img.getHeight();
         byte[] buf = new byte[4096];
 
         putInt(buf, 0, width);
@@ -82,8 +90,7 @@ public class Texture {
             digest.update(buf, 0, pos);
         }
 
-        byte[] sha256 = digest.digest();
-        return String.format("%0" + (sha256.length << 1) + "x", new BigInteger(1, sha256));
+        return Hex.encodeHex(digest.digest());
     }
 
     private static void putInt(byte[] array, int offset, int x) {
@@ -95,33 +102,31 @@ public class Texture {
 
     public static Texture loadTexture(InputStream in) throws IOException {
         if (in == null) return null;
-        Bitmap img = BitmapFactory.decodeStream(in);
-        if (img == null) {
-            throw new IOException("No image found");
+        Bitmap img;
+        try (InputStream is = in) {
+            img = BitmapFactory.decodeStream(is);
         }
 
-        String hash = computeTextureHash(img);
+        return loadTexture(img);
+    }
+
+    public static Texture loadTexture(Bitmap image) {
+        if (image == null) return null;
+
+        String hash = computeTextureHash(image);
 
         Texture existent = textures.get(hash);
         if (existent != null) {
             return existent;
         }
 
-        ByteArrayOutputStream buf = new ByteArrayOutputStream();
-        img.compress(Bitmap.CompressFormat.PNG, 100, buf);
-        Texture texture = new Texture(hash, buf.toByteArray());
-
+        Texture texture = new Texture(hash, image);
         existent = textures.putIfAbsent(hash, texture);
 
         if (existent != null) {
             return existent;
         }
         return texture;
-    }
-
-    public static Texture loadTexture(String url) throws IOException {
-        if (url == null) return null;
-        return loadTexture(new URL(url).openStream());
     }
 
 }

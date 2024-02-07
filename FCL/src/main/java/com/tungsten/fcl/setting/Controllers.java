@@ -4,7 +4,7 @@ import static com.tungsten.fcl.util.FXUtils.onInvalidating;
 import static com.tungsten.fclcore.fakefx.collections.FXCollections.observableArrayList;
 
 import com.google.gson.GsonBuilder;
-import com.tungsten.fclauncher.FCLPath;
+import com.tungsten.fclauncher.utils.FCLPath;
 import com.tungsten.fclcore.fakefx.beans.Observable;
 import com.tungsten.fclcore.fakefx.beans.property.ReadOnlyListProperty;
 import com.tungsten.fclcore.fakefx.beans.property.ReadOnlyListWrapper;
@@ -16,7 +16,6 @@ import com.tungsten.fclcore.util.io.IOUtils;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
@@ -33,7 +32,7 @@ public class Controllers {
     public static void checkControllers() {
         if (controllers.isEmpty()) {
             try {
-                String str = IOUtils.readFullyAsString(Controllers.class.getResourceAsStream("/assets/controllers/Default.json"), StandardCharsets.UTF_8);
+                String str = IOUtils.readFullyAsString(Controllers.class.getResourceAsStream("/assets/controllers/Default.json"));
                 Controller controller = new GsonBuilder()
                         .registerTypeAdapterFactory(new JavaFxPropertyTypeAdapterFactory(true, true))
                         .setPrettyPrinting()
@@ -74,7 +73,7 @@ public class Controllers {
             try {
                 controller.saveToDisk();
             } catch (IOException e) {
-                Logging.LOG.log(Level.SEVERE, "Failed to save controller!");
+                Logging.LOG.log(Level.SEVERE, "Failed to save controller!", e);
             }
         }
     }

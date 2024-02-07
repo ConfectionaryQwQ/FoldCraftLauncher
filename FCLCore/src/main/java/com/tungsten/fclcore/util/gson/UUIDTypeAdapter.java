@@ -1,3 +1,20 @@
+/*
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 package com.tungsten.fclcore.util.gson;
 
 import com.google.gson.JsonParseException;
@@ -7,6 +24,7 @@ import com.google.gson.stream.JsonWriter;
 
 import java.io.IOException;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 public final class UUIDTypeAdapter extends TypeAdapter<UUID> {
 
@@ -30,8 +48,10 @@ public final class UUIDTypeAdapter extends TypeAdapter<UUID> {
         return value.toString().replace("-", "");
     }
 
+    private static final Pattern regex = Pattern.compile("(\\w{8})(\\w{4})(\\w{4})(\\w{4})(\\w{12})");
+
     public static UUID fromString(String input) {
-        return UUID.fromString(input.replaceFirst("(\\w{8})(\\w{4})(\\w{4})(\\w{4})(\\w{12})", "$1-$2-$3-$4-$5"));
+        return UUID.fromString(regex.matcher(input).replaceFirst("$1-$2-$3-$4-$5"));
     }
 
 }

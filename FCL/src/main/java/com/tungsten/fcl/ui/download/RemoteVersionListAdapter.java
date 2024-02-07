@@ -1,7 +1,10 @@
 package com.tungsten.fcl.ui.download;
 
+import static com.tungsten.fcllibrary.util.LocaleUtils.formatDateTime;
+
 import android.annotation.SuppressLint;
 import android.content.Context;
+import android.content.res.ColorStateList;
 import android.graphics.drawable.Drawable;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -14,16 +17,16 @@ import com.tungsten.fclcore.download.fabric.FabricRemoteVersion;
 import com.tungsten.fclcore.download.forge.ForgeRemoteVersion;
 import com.tungsten.fclcore.download.game.GameRemoteVersion;
 import com.tungsten.fclcore.download.liteloader.LiteLoaderRemoteVersion;
+import com.tungsten.fclcore.download.neoforge.NeoForgeRemoteVersion;
 import com.tungsten.fclcore.download.optifine.OptiFineRemoteVersion;
 import com.tungsten.fclcore.download.quilt.QuiltAPIRemoteVersion;
 import com.tungsten.fclcore.download.quilt.QuiltRemoteVersion;
 import com.tungsten.fcllibrary.component.FCLAdapter;
+import com.tungsten.fcllibrary.component.theme.ThemeEngine;
 import com.tungsten.fcllibrary.component.view.FCLImageView;
 import com.tungsten.fcllibrary.component.view.FCLLinearLayout;
 import com.tungsten.fcllibrary.component.view.FCLTextView;
 
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 
 public class RemoteVersionListAdapter extends FCLAdapter {
@@ -55,6 +58,7 @@ public class RemoteVersionListAdapter extends FCLAdapter {
         return list.get(i);
     }
 
+    @SuppressLint("UseCompatLoadingForDrawables")
     @Override
     public View getView(int i, View view, ViewGroup viewGroup) {
         final ViewHolder viewHolder;
@@ -67,17 +71,19 @@ public class RemoteVersionListAdapter extends FCLAdapter {
             viewHolder.tag = view.findViewById(R.id.tag);
             viewHolder.date = view.findViewById(R.id.date);
             view.setTag(viewHolder);
-        }
-        else {
+        } else {
             viewHolder = (ViewHolder) view.getTag();
         }
         RemoteVersion remoteVersion = list.get(i);
         viewHolder.parent.setOnClickListener(view1 -> listener.onSelect(remoteVersion));
         viewHolder.icon.setBackground(getIcon(remoteVersion));
         viewHolder.version.setText(remoteVersion.getSelfVersion());
+        viewHolder.tag.setBackground(getContext().getDrawable(R.drawable.bg_container_white));
+        viewHolder.tag.setAutoBackgroundTint(true);
+        viewHolder.tag.setBackgroundTintList(new ColorStateList(new int[][] { { } }, new int[]{ ThemeEngine.getInstance().getTheme().getColor() }));
         viewHolder.tag.setText(getTag(remoteVersion));
         viewHolder.date.setVisibility(remoteVersion.getReleaseDate() == null ? View.GONE : View.VISIBLE);
-        viewHolder.date.setText(remoteVersion.getReleaseDate() == null ? "" : DateTimeFormatter.ofPattern(getContext().getString(R.string.world_time)).withZone(ZoneId.systemDefault()).format(remoteVersion.getReleaseDate().toInstant()));
+        viewHolder.date.setText(remoteVersion.getReleaseDate() == null ? "" : formatDateTime(getContext(), remoteVersion.getReleaseDate().toInstant()));
         return view;
     }
 
@@ -86,9 +92,11 @@ public class RemoteVersionListAdapter extends FCLAdapter {
         if (remoteVersion instanceof LiteLoaderRemoteVersion)
             return getContext().getDrawable(R.drawable.img_chicken);
         else if (remoteVersion instanceof OptiFineRemoteVersion)
-            return getContext().getDrawable(R.drawable.img_command);
+            return getContext().getDrawable(R.drawable.img_optifine);
         else if (remoteVersion instanceof ForgeRemoteVersion)
             return getContext().getDrawable(R.drawable.img_forge);
+        else if (remoteVersion instanceof NeoForgeRemoteVersion)
+            return getContext().getDrawable(R.drawable.img_neoforge);
         else if (remoteVersion instanceof FabricRemoteVersion || remoteVersion instanceof FabricAPIRemoteVersion)
             return getContext().getDrawable(R.drawable.img_fabric);
         else if (remoteVersion instanceof QuiltRemoteVersion || remoteVersion instanceof QuiltAPIRemoteVersion)

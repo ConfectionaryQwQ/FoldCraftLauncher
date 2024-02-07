@@ -1,3 +1,20 @@
+/*
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 package com.tungsten.fclcore.util;
 
 import java.io.IOException;
@@ -24,10 +41,6 @@ public final class DigestUtils {
         }
     }
 
-    public static byte[] digest(String algorithm, String data) {
-        return digest(algorithm, data.getBytes(UTF_8));
-    }
-
     public static byte[] digest(String algorithm, byte[] data) {
         return getDigest(algorithm).digest(data);
     }
@@ -46,8 +59,22 @@ public final class DigestUtils {
         return updateDigest(digest, data).digest();
     }
 
+    public static String digestToString(String algorithm, byte[] data) throws IOException {
+        return Hex.encodeHex(digest(algorithm, data));
+    }
+
+    public static String digestToString(String algorithm, Path path) throws IOException {
+        return Hex.encodeHex(digest(algorithm, path));
+    }
+
+    public static String digestToString(String algorithm, InputStream data) throws IOException {
+        return Hex.encodeHex(digest(algorithm, data));
+    }
+
+    private static final ThreadLocal<byte[]> threadLocalBuffer = ThreadLocal.withInitial(() -> new byte[STREAM_BUFFER_LENGTH]);
+
     public static MessageDigest updateDigest(MessageDigest digest, InputStream data) throws IOException {
-        byte[] buffer = new byte[STREAM_BUFFER_LENGTH];
+        byte[] buffer = threadLocalBuffer.get();
         int read = data.read(buffer, 0, STREAM_BUFFER_LENGTH);
 
         while (read > -1) {

@@ -1,3 +1,20 @@
+/*
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 package com.tungsten.fclcore.mod.multimc;
 
 import com.google.gson.JsonParseException;
@@ -57,6 +74,12 @@ public final class MultiMCModpackInstallTask extends Task<Void> {
                     builder.version("forge", c.getVersion());
             });
 
+            Optional<MultiMCManifest.MultiMCManifestComponent> neoForge = manifest.getMmcPack().getComponents().stream().filter(e -> e.getUid().equals("net.neoforged")).findAny();
+            neoForge.ifPresent(c -> {
+                if (c.getVersion() != null)
+                    builder.version("neoforge", c.getVersion());
+            });
+
             Optional<MultiMCManifest.MultiMCManifestComponent> liteLoader = manifest.getMmcPack().getComponents().stream().filter(e -> e.getUid().equals("com.mumfrey.liteloader")).findAny();
             liteLoader.ifPresent(c -> {
                 if (c.getVersion() != null)
@@ -69,7 +92,7 @@ public final class MultiMCModpackInstallTask extends Task<Void> {
                     builder.version("fabric", c.getVersion());
             });
 
-            Optional<MultiMCManifest.MultiMCManifestComponent> quilt = manifest.getMmcPack().getComponents().stream().filter(e -> e.getUid().equals("net.quiltmc.quilt-loader")).findAny();
+            Optional<MultiMCManifest.MultiMCManifestComponent> quilt = manifest.getMmcPack().getComponents().stream().filter(e -> e.getUid().equals("org.quiltmc.quilt-loader")).findAny();
             quilt.ifPresent(c -> {
                 if (c.getVersion() != null)
                     builder.version("quilt", c.getVersion());
@@ -113,12 +136,20 @@ public final class MultiMCModpackInstallTask extends Task<Void> {
         String subDirectory;
 
         try (FileSystem fs = CompressingUtils.readonly(zipFile.toPath()).setEncoding(modpack.getEncoding()).build()) {
-            if (Files.exists(fs.getPath("/" + manifest.getName() + "/.minecraft"))) {
+            // /.minecraft
+            if (Files.exists(fs.getPath("/.minecraft"))) {
+                subDirectory = "/.minecraft";
+                // /minecraft
+            } else if (Files.exists(fs.getPath("/minecraft"))) {
+                subDirectory = "/minecraft";
+                // /[name]/.minecraft
+            } else if (Files.exists(fs.getPath("/" + manifest.getName() + "/.minecraft"))) {
                 subDirectory = "/" + manifest.getName() + "/.minecraft";
+                // /[name]/minecraft
             } else if (Files.exists(fs.getPath("/" + manifest.getName() + "/minecraft"))) {
                 subDirectory = "/" + manifest.getName() + "/minecraft";
             } else {
-                subDirectory = "/" + manifest.getName() + "/minecraft";
+                subDirectory = "/" + manifest.getName() + "/.minecraft";
             }
         }
 

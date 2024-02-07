@@ -1,9 +1,24 @@
+/*
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 package com.tungsten.fcl.setting;
 
-import static com.tungsten.fcl.setting.ConfigHolder.config;
-
 import com.tungsten.fcl.game.FCLCacheRepository;
-import com.tungsten.fclcore.fakefx.beans.binding.Bindings;
+import com.tungsten.fclauncher.utils.FCLPath;
 import com.tungsten.fclcore.util.CacheRepository;
 
 public final class Settings {
@@ -32,7 +47,7 @@ public final class Settings {
         AuthlibInjectorServers.init();
 
         CacheRepository.setInstance(FCLCacheRepository.REPOSITORY);
-        FCLCacheRepository.REPOSITORY.directoryProperty().bind(Bindings.createStringBinding(() -> config().getCommonDirectory(), config().commonDirectoryProperty()));
+        FCLCacheRepository.REPOSITORY.setDirectory(FCLPath.CACHE_DIR);
     }
 
 }

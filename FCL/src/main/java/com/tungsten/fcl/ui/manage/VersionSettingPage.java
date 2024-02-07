@@ -25,7 +25,6 @@ import com.tungsten.fclcore.fakefx.beans.property.SimpleIntegerProperty;
 import com.tungsten.fclcore.fakefx.beans.property.SimpleStringProperty;
 import com.tungsten.fclcore.fakefx.beans.property.StringProperty;
 import com.tungsten.fclcore.game.JavaVersion;
-import com.tungsten.fclcore.game.ProcessPriority;
 import com.tungsten.fclcore.task.Schedulers;
 import com.tungsten.fclcore.task.Task;
 import com.tungsten.fclcore.util.Lang;
@@ -79,8 +78,7 @@ public class VersionSettingPage extends FCLCommonPage implements ManageUI.Versio
     private FCLSwitch noGameCheckSwitch;
     private FCLSwitch noJVMCheckSwitch;
 
-    private FCLSpinner<Integer> javaSpinner;
-    private FCLSpinner<ProcessPriority> processPrioritySpinner;
+    private FCLSpinner<String> javaSpinner;
     private FCLSpinner<FCLConfig.Renderer> rendererSpinner;
 
     private FCLImageButton editIconButton;
@@ -127,57 +125,48 @@ public class VersionSettingPage extends FCLCommonPage implements ManageUI.Versio
         isolateWorkingDirSwitch.disableProperty().bind(modpack);
 
         javaSpinner = findViewById(R.id.edit_java);
-        processPrioritySpinner = findViewById(R.id.edit_process_priority);
         rendererSpinner = findViewById(R.id.edit_renderer);
 
         FCLTextView scaleFactorText = findViewById(R.id.scale_factor_text);
 
         scaleFactorSeekbar.addProgressListener();
-        scaleFactorText.stringProperty().bind(Bindings.createStringBinding(() -> scaleFactorSeekbar.getProgress() + " %", scaleFactorSeekbar.percentProgressProperty()));
+        scaleFactorText.stringProperty().bind(Bindings.createStringBinding(() -> (int) (lastVersionSetting.getScaleFactor() * 100) + " %", scaleFactorSeekbar.percentProgressProperty()));
 
         // add spinner data
-        ArrayList<Integer> javaVersionDataList = new ArrayList<>();
-        javaVersionDataList.add(JavaVersion.JAVA_AUTO.getId());
-        javaVersionDataList.add(JavaVersion.JAVA_8.getId());
-        javaVersionDataList.add(JavaVersion.JAVA_17.getId());
+        ArrayList<String> javaVersionDataList = new ArrayList<>();
+        javaVersionDataList.add(JavaVersion.JAVA_AUTO.getVersionName());
+        javaVersionDataList.add(JavaVersion.JAVA_8.getVersionName());
+        javaVersionDataList.add(JavaVersion.JAVA_11.getVersionName());
+        javaVersionDataList.add(JavaVersion.JAVA_17.getVersionName());
+        javaVersionDataList.add(JavaVersion.JAVA_21.getVersionName());
         javaSpinner.setDataList(javaVersionDataList);
-
-        ArrayList<ProcessPriority> processPriorityDataList = new ArrayList<>();
-        processPriorityDataList.add(ProcessPriority.LOW);
-        processPriorityDataList.add(ProcessPriority.NORMAL);
-        processPriorityDataList.add(ProcessPriority.HIGH);
-        processPrioritySpinner.setDataList(processPriorityDataList);
 
         ArrayList<FCLConfig.Renderer> rendererDataList = new ArrayList<>();
         rendererDataList.add(FCLConfig.Renderer.RENDERER_GL4ES);
-        rendererDataList.add(FCLConfig.Renderer.RENDERER_ZINK);
+        rendererDataList.add(FCLConfig.Renderer.RENDERER_VIRGL);
         rendererDataList.add(FCLConfig.Renderer.RENDERER_ANGLE);
         rendererDataList.add(FCLConfig.Renderer.RENDERER_VGPU);
+        rendererDataList.add(FCLConfig.Renderer.RENDERER_ZINK);
         rendererSpinner.setDataList(rendererDataList);
 
         // add spinner text
         ArrayList<String> javaVersionList = new ArrayList<>();
         javaVersionList.add(getContext().getString(R.string.settings_game_java_version_auto));
         javaVersionList.add("JRE 8");
+        javaVersionList.add("JRE 11");
         javaVersionList.add("JRE 17");
-        ArrayAdapter<String> javaAdapter = new ArrayAdapter<>(getContext(), R.layout.item_spinner, javaVersionList);
+        javaVersionList.add("JRE 21");
+        ArrayAdapter<String> javaAdapter = new ArrayAdapter<>(getContext(), R.layout.item_spinner_auto_tint, javaVersionList);
         javaAdapter.setDropDownViewResource(R.layout.item_spinner_dropdown);
         javaSpinner.setAdapter(javaAdapter);
-
-        ArrayList<String> processPriorityList = new ArrayList<>();
-        processPriorityList.add(getContext().getString(R.string.settings_advanced_process_priority_low));
-        processPriorityList.add(getContext().getString(R.string.settings_advanced_process_priority_normal));
-        processPriorityList.add(getContext().getString(R.string.settings_advanced_process_priority_high));
-        ArrayAdapter<String> processPriorityAdapter = new ArrayAdapter<>(getContext(), R.layout.item_spinner, processPriorityList);
-        processPriorityAdapter.setDropDownViewResource(R.layout.item_spinner_dropdown);
-        processPrioritySpinner.setAdapter(processPriorityAdapter);
 
         ArrayList<String> rendererList = new ArrayList<>();
         rendererList.add(getContext().getString(R.string.settings_fcl_renderer_gl4es));
         rendererList.add(getContext().getString(R.string.settings_fcl_renderer_virgl));
         rendererList.add(getContext().getString(R.string.settings_fcl_renderer_angle));
         rendererList.add(getContext().getString(R.string.settings_fcl_renderer_vgpu));
-        ArrayAdapter<String> rendererAdapter = new ArrayAdapter<>(getContext(), R.layout.item_spinner, rendererList);
+        rendererList.add(getContext().getString(R.string.settings_fcl_renderer_zink));
+        ArrayAdapter<String> rendererAdapter = new ArrayAdapter<>(getContext(), R.layout.item_spinner_auto_tint, rendererList);
         rendererAdapter.setDropDownViewResource(R.layout.item_spinner_dropdown);
         rendererSpinner.setAdapter(rendererAdapter);
 
@@ -281,8 +270,11 @@ public class VersionSettingPage extends FCLCommonPage implements ManageUI.Versio
         modpack.set(versionId != null && profile.getRepository().isModpack(versionId));
         usedMemory.set(MemoryUtils.getUsedDeviceMemory(getContext()));
 
+        InvalidationListener listener = observable -> ManagePageManager.getInstance().onRunDirectoryChange(profile, versionId);
+
         // unbind data fields
         if (lastVersionSetting != null) {
+            lastVersionSetting.isolateGameDirProperty().removeListener(listener);
             FXUtils.unbind(txtJVMArgs, lastVersionSetting.javaArgsProperty());
             FXUtils.unbind(txtGameArgs, lastVersionSetting.minecraftArgsProperty());
             FXUtils.unbind(txtMetaspace, lastVersionSetting.permSizeProperty());
@@ -293,7 +285,6 @@ public class VersionSettingPage extends FCLCommonPage implements ManageUI.Versio
             FXUtils.unbindBoolean(noJVMCheckSwitch, lastVersionSetting.notCheckJVMProperty());
             FXUtils.unbindBoolean(beGestureSwitch, lastVersionSetting.beGestureProperty());
             FXUtils.unbindSelection(javaSpinner, lastVersionSetting.javaProperty());
-            FXUtils.unbindSelection(processPrioritySpinner, lastVersionSetting.processPriorityProperty());
             FXUtils.unbindSelection(rendererSpinner, lastVersionSetting.rendererProperty());
             scaleFactorSeekbar.percentProgressProperty().unbindBidirectional(lastVersionSetting.scaleFactorProperty());
             maxMemory.unbindBidirectional(lastVersionSetting.maxMemoryProperty());
@@ -302,6 +293,9 @@ public class VersionSettingPage extends FCLCommonPage implements ManageUI.Versio
         }
 
         // bind new data fields
+        if (getId() == ManagePageManager.PAGE_ID_MANAGE_SETTING) {
+            versionSetting.isolateGameDirProperty().addListener(listener);
+        }
         FXUtils.bindString(txtJVMArgs, versionSetting.javaArgsProperty());
         FXUtils.bindString(txtGameArgs, versionSetting.minecraftArgsProperty());
         FXUtils.bindString(txtMetaspace, versionSetting.permSizeProperty());
@@ -312,7 +306,6 @@ public class VersionSettingPage extends FCLCommonPage implements ManageUI.Versio
         FXUtils.bindBoolean(noJVMCheckSwitch, versionSetting.notCheckJVMProperty());
         FXUtils.bindBoolean(beGestureSwitch, versionSetting.beGestureProperty());
         FXUtils.bindSelection(javaSpinner, versionSetting.javaProperty());
-        FXUtils.bindSelection(processPrioritySpinner, versionSetting.processPriorityProperty());
         FXUtils.bindSelection(rendererSpinner, versionSetting.rendererProperty());
         scaleFactorSeekbar.percentProgressProperty().bindBidirectional(versionSetting.scaleFactorProperty());
         maxMemory.bindBidirectional(versionSetting.maxMemoryProperty());

@@ -1,3 +1,20 @@
+/*
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 package com.tungsten.fclcore.util.skin;
 
 import android.graphics.Bitmap;
@@ -6,7 +23,7 @@ import android.graphics.Bitmap;
  * Describes a Minecraft 1.8+ skin (64x64).
  * Old format skins are converted to the new format.
  */
-public class NormalizedSkin {
+public final class NormalizedSkin {
 
     private static void copyImage(Bitmap src, Bitmap dst, int sx, int sy, int dx, int dy, int w, int h, boolean flipHorizontal) {
         for (int y = 0; y < h; y++) {
@@ -26,8 +43,8 @@ public class NormalizedSkin {
         this.texture = texture;
 
         // check format
-        int w = texture.getWidth();
-        int h = texture.getHeight();
+        int w = (int) texture.getWidth();
+        int h = (int) texture.getHeight();
         if (w % 64 != 0) {
             throw new InvalidSkinException("Invalid size " + w + "x" + h);
         }
@@ -84,10 +101,6 @@ public class NormalizedSkin {
         return oldFormat;
     }
 
-    /**
-     * Tests whether the skin is slim.
-     * Note that this method doesn't guarantee the result is correct.
-     */
     public boolean isSlim() {
         return (hasTransparencyRelative(50, 16, 2, 4) ||
                 hasTransparencyRelative(54, 20, 2, 12) ||

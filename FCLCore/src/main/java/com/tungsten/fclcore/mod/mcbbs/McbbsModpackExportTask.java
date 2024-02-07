@@ -1,12 +1,29 @@
+/*
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 package com.tungsten.fclcore.mod.mcbbs;
 
 import static com.tungsten.fclcore.download.LibraryAnalyzer.LibraryType.FABRIC;
 import static com.tungsten.fclcore.download.LibraryAnalyzer.LibraryType.FORGE;
 import static com.tungsten.fclcore.download.LibraryAnalyzer.LibraryType.LITELOADER;
 import static com.tungsten.fclcore.download.LibraryAnalyzer.LibraryType.MINECRAFT;
+import static com.tungsten.fclcore.download.LibraryAnalyzer.LibraryType.NEO_FORGE;
 import static com.tungsten.fclcore.download.LibraryAnalyzer.LibraryType.OPTIFINE;
-import static com.tungsten.fclcore.util.DigestUtils.digest;
-import static com.tungsten.fclcore.util.Hex.encodeHex;
+import static com.tungsten.fclcore.download.LibraryAnalyzer.LibraryType.QUILT;
 
 import com.tungsten.fclcore.download.LibraryAnalyzer;
 import com.tungsten.fclcore.game.DefaultGameRepository;
@@ -18,6 +35,7 @@ import com.tungsten.fclcore.mod.curse.CurseManifest;
 import com.tungsten.fclcore.mod.curse.CurseManifestMinecraft;
 import com.tungsten.fclcore.mod.curse.CurseManifestModLoader;
 import com.tungsten.fclcore.task.Task;
+import com.tungsten.fclcore.util.DigestUtils;
 import com.tungsten.fclcore.util.Logging;
 import com.tungsten.fclcore.util.StringUtils;
 import com.tungsten.fclcore.util.gson.JsonUtils;
@@ -62,7 +80,7 @@ public class McbbsModpackExportTask extends Task<Void> {
                     Path file = runDirectory.resolve(path);
                     if (Files.isRegularFile(file)) {
                         String relativePath = runDirectory.relativize(file).normalize().toString().replace(File.separatorChar, '/');
-                        files.add(new McbbsModpackManifest.AddonFile(true, relativePath, encodeHex(digest("SHA-1", file))));
+                        files.add(new McbbsModpackManifest.AddonFile(true, relativePath, DigestUtils.digestToString("SHA-1", file)));
                     }
                     return true;
                 } else {
@@ -79,12 +97,16 @@ public class McbbsModpackExportTask extends Task<Void> {
             addons.add(new McbbsModpackManifest.Addon(MINECRAFT.getPatchId(), gameVersion));
             analyzer.getVersion(FORGE).ifPresent(forgeVersion ->
                     addons.add(new McbbsModpackManifest.Addon(FORGE.getPatchId(), forgeVersion)));
+            analyzer.getVersion(NEO_FORGE).ifPresent(neoForgeVersion ->
+                    addons.add(new McbbsModpackManifest.Addon(NEO_FORGE.getPatchId(), neoForgeVersion)));
             analyzer.getVersion(LITELOADER).ifPresent(liteLoaderVersion ->
                     addons.add(new McbbsModpackManifest.Addon(LITELOADER.getPatchId(), liteLoaderVersion)));
             analyzer.getVersion(OPTIFINE).ifPresent(optifineVersion ->
                     addons.add(new McbbsModpackManifest.Addon(OPTIFINE.getPatchId(), optifineVersion)));
             analyzer.getVersion(FABRIC).ifPresent(fabricVersion ->
                     addons.add(new McbbsModpackManifest.Addon(FABRIC.getPatchId(), fabricVersion)));
+            analyzer.getVersion(QUILT).ifPresent(quiltVersion ->
+                    addons.add(new McbbsModpackManifest.Addon(QUILT.getPatchId(), quiltVersion)));
 
             List<Library> libraries = new ArrayList<>();
             // TODO libraries
@@ -101,6 +123,7 @@ public class McbbsModpackExportTask extends Task<Void> {
             // CurseForge manifest
             List<CurseManifestModLoader> modLoaders = new ArrayList<>();
             analyzer.getVersion(FORGE).ifPresent(forgeVersion -> modLoaders.add(new CurseManifestModLoader("forge-" + forgeVersion, true)));
+            analyzer.getVersion(NEO_FORGE).ifPresent(forgeVersion -> modLoaders.add(new CurseManifestModLoader("neoforge-" + forgeVersion, true)));
             analyzer.getVersion(FABRIC).ifPresent(fabricVersion -> modLoaders.add(new CurseManifestModLoader("fabric-" + fabricVersion, true)));
             // OptiFine and LiteLoader are not supported by CurseForge modpack.
             CurseManifest curseManifest = new CurseManifest(CurseManifest.MINECRAFT_MODPACK, 1, info.getName(), info.getVersion(), info.getAuthor(), "overrides", new CurseManifestMinecraft(gameVersion, modLoaders), Collections.emptyList());

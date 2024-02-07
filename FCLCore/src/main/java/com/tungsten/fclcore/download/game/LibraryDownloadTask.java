@@ -1,10 +1,25 @@
+/*
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 package com.tungsten.fclcore.download.game;
 
-import static com.tungsten.fclcore.util.DigestUtils.digest;
-import static com.tungsten.fclcore.util.Hex.encodeHex;
 import static com.tungsten.fclcore.util.Logging.LOG;
 
-import com.tungsten.fclauncher.FCLPath;
+import com.tungsten.fclauncher.utils.FCLPath;
 import com.tungsten.fclcore.download.AbstractDependencyManager;
 import com.tungsten.fclcore.download.ArtifactMalformedException;
 import com.tungsten.fclcore.download.DefaultCacheRepository;
@@ -12,6 +27,7 @@ import com.tungsten.fclcore.game.Library;
 import com.tungsten.fclcore.task.DownloadException;
 import com.tungsten.fclcore.task.FileDownloadTask;
 import com.tungsten.fclcore.task.Task;
+import com.tungsten.fclcore.util.DigestUtils;
 import com.tungsten.fclcore.util.Pack200Utils;
 import com.tungsten.fclcore.util.io.FileUtils;
 import com.tungsten.fclcore.util.io.IOUtils;
@@ -87,7 +103,7 @@ public class LibraryDownloadTask extends Task<Void> {
             else
                 throw new LibraryDownloadException(library, t);
         } else {
-            // if (xz) unpackLibrary(jar, Files.readAllBytes(xzFile.toPath()));
+            if (xz) unpackLibrary(jar, Files.readAllBytes(xzFile.toPath()));
         }
     }
 
@@ -131,9 +147,12 @@ public class LibraryDownloadTask extends Task<Void> {
     private boolean testURLExistence(String rawUrl) {
         List<URL> urls = dependencyManager.getDownloadProvider().injectURLWithCandidates(rawUrl);
         for (URL url : urls) {
-            URL xzURL = NetworkUtils.toURL(url.toString() + ".pack.xz");
+            URL rawURL = NetworkUtils.toURL(url.toString());
+            URL xzURL = NetworkUtils.toURL(url + ".pack.xz");
             for (int retry = 0; retry < 3; retry++) {
                 try {
+                    if (NetworkUtils.urlExists(rawURL))
+                        return false;
                     return NetworkUtils.urlExists(xzURL);
                 } catch (IOException e) {
                     LOG.log(Level.WARNING, "Failed to test for url existence: " + url + ".pack.xz", e);
@@ -165,7 +184,7 @@ public class LibraryDownloadTask extends Task<Void> {
                 return true;
             }
             byte[] fileData = Files.readAllBytes(libPath.toPath());
-            boolean valid = checksums.contains(encodeHex(digest("SHA-1", fileData)));
+            boolean valid = checksums.contains(DigestUtils.digestToString("SHA-1", fileData));
             if (!valid && libPath.getName().endsWith(".jar")) {
                 valid = validateJar(fileData, checksums);
             }
@@ -187,7 +206,7 @@ public class LibraryDownloadTask extends Task<Void> {
                 hashes = new String(eData, StandardCharsets.UTF_8).split("\n");
             }
             if (!entry.isDirectory()) {
-                files.put(entry.getName(), encodeHex(digest("SHA-1", eData)));
+                files.put(entry.getName(), DigestUtils.digestToString("SHA-1", eData));
             }
             entry = jar.getNextJarEntry();
         }
@@ -253,10 +272,6 @@ public class LibraryDownloadTask extends Task<Void> {
             jos.putNextEntry(checksumsFile);
             jos.write(checksums);
             jos.closeEntry();
-        }
-
-        if (temp.toFile().exists()) {
-            Files.delete(temp);
         }
     }
 }

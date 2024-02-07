@@ -4,6 +4,7 @@ import static com.tungsten.fclauncher.utils.Architecture.ARCH_X86;
 import static com.tungsten.fclauncher.utils.Architecture.is64BitsDevice;
 
 import android.content.Context;
+import android.os.Build;
 import android.util.ArrayMap;
 
 import com.jaredrummler.android.device.DeviceName;
@@ -21,9 +22,6 @@ import java.util.Map;
 
 public class FCLauncher {
 
-    // Todo : mouse scroll event
-    // Todo : mesa
-
     private static void printTaskTitle(FCLBridge bridge, String task) {
         bridge.getCallback().onLog("==================== " + task + " ====================");
     }
@@ -32,6 +30,7 @@ public class FCLauncher {
         printTaskTitle(bridge, "Start " + task);
         bridge.getCallback().onLog("Device: " + DeviceName.getDeviceName());
         bridge.getCallback().onLog("Architecture: " + Architecture.archAsString(Architecture.getDeviceArchitecture()));
+        bridge.getCallback().onLog("CPU:" + Build.HARDWARE);
     }
 
     private static Map<String, String> readJREReleaseProperties(String javaPath) throws IOException {
@@ -124,12 +123,13 @@ public class FCLauncher {
     private static void addCommonEnv(FCLConfig config, HashMap<String, String> envMap) {
         envMap.put("HOME", config.getLogDir());
         envMap.put("JAVA_HOME", config.getJavaPath());
+        envMap.put("FCL_NATIVEDIR", config.getContext().getApplicationInfo().nativeLibraryDir);
+        envMap.put("TMPDIR", config.getContext().getCacheDir().getAbsolutePath());
     }
 
     private static void addRendererEnv(FCLConfig config, HashMap<String, String> envMap) {
-        // Todo : mesa env
         FCLConfig.Renderer renderer = config.getRenderer() == null ? FCLConfig.Renderer.RENDERER_GL4ES : config.getRenderer();
-        String nativeDir = config.getContext().getApplicationInfo().nativeLibraryDir;
+        envMap.put("LIBGL_STRING", renderer.toString());
         envMap.put("LIBGL_NAME", renderer.getGlLibName());
         envMap.put("LIBEGL_NAME", renderer.getEglLibName());
         if (renderer == FCLConfig.Renderer.RENDERER_GL4ES || renderer == FCLConfig.Renderer.RENDERER_VGPU) {
@@ -138,18 +138,24 @@ public class FCLauncher {
             envMap.put("LIBGL_NORMALIZE", "1");
             envMap.put("LIBGL_VSYNC", "1");
             envMap.put("LIBGL_NOINTOVLHACK", "1");
+            envMap.put("LIBGL_NOERROR", "1");
         } else if (renderer == FCLConfig.Renderer.RENDERER_ANGLE) {
             envMap.put("LIBGL_ES","3");
-            envMap.put("LIBGL_MIPMAP", "3");
-            envMap.put("LIBGL_NORMALIZE", "1");
-            envMap.put("LIBGL_VSYNC", "1");
-            envMap.put("LIBGL_NOINTOVLHACK", "1");
         } else {
-            envMap.put("LIBGL_DRIVERS_PATH", nativeDir);
-            envMap.put("MESA_GL_VERSION_OVERRIDE", "4.6");
-            envMap.put("MESA_GLSL_VERSION_OVERRIDE", "460");
-            envMap.put("GALLIUM_DRIVER", "zink");
             envMap.put("MESA_GLSL_CACHE_DIR", config.getContext().getCacheDir().getAbsolutePath());
+            envMap.put("MESA_GL_VERSION_OVERRIDE", renderer == FCLConfig.Renderer.RENDERER_VIRGL ? "4.3" : "4.6");
+            envMap.put("MESA_GLSL_VERSION_OVERRIDE", renderer == FCLConfig.Renderer.RENDERER_VIRGL ? "430" : "460");
+            envMap.put("force_glsl_extensions_warn", "true");
+            envMap.put("allow_higher_compat_version", "true");
+            envMap.put("allow_glsl_extension_directive_midshader", "true");
+            envMap.put("MESA_LOADER_DRIVER_OVERRIDE", "zink");
+            envMap.put("VTEST_SOCKET_NAME", new File(config.getContext().getCacheDir().getAbsolutePath(), ".virgl_test").getAbsolutePath());
+            if (renderer == FCLConfig.Renderer.RENDERER_VIRGL) {
+                envMap.put("GALLIUM_DRIVER", "virpipe");
+                envMap.put("OSMESA_NO_FLUSH_FRONTBUFFER", "1");
+            } else if (renderer == FCLConfig.Renderer.RENDERER_ZINK) {
+                envMap.put("GALLIUM_DRIVER", "zink");
+            }
         }
     }
 
@@ -169,7 +175,7 @@ public class FCLauncher {
 
     private static void setUpJavaRuntime(FCLConfig config, FCLBridge bridge) throws IOException {
         String jreLibDir = config.getJavaPath() + getJreLibDir(config.getJavaPath());
-        String jliLibDir = jreLibDir + "/jli";
+        String jliLibDir = new File(jreLibDir + "/jli/libjli.so").exists() ? jreLibDir + "/jli" : jreLibDir;
         String jvmLibDir = jreLibDir + getJvmLibDir(config.getJavaPath());
         // dlopen jre
         bridge.dlopen(jliLibDir + "/libjli.so");
@@ -208,16 +214,6 @@ public class FCLauncher {
         String nativeDir = config.getContext().getApplicationInfo().nativeLibraryDir;
 
         bridge.dlopen(nativeDir + "/libopenal.so");
-
-        // Todo : mesa
-        FCLConfig.Renderer renderer = config.getRenderer() == null ? FCLConfig.Renderer.RENDERER_GL4ES : config.getRenderer();
-        bridge.dlopen(nativeDir + "/" + renderer.getGlLibName());
-        bridge.dlopen(nativeDir + "/" + renderer.getEglLibName());
-        if (renderer == FCLConfig.Renderer.RENDERER_ZINK) {
-            bridge.dlopen(nativeDir + "/libglapi.so");
-            bridge.dlopen(nativeDir + "/libexpat.so");
-            bridge.dlopen(nativeDir + "/zink_dri.so");
-        }
     }
 
     private static void launch(FCLConfig config, FCLBridge bridge, String task) throws IOException {
@@ -268,15 +264,15 @@ public class FCLauncher {
         return bridge;
     }
 
-    public static FCLBridge launchJavaGUI(FCLConfig config) {
+    public static FCLBridge launchJarExecutor(FCLConfig config) {
 
         // initialize FCLBridge
         FCLBridge bridge = new FCLBridge();
-        bridge.setLogPath(config.getLogDir() + "/latest_java_gui.log");
+        bridge.setLogPath(config.getLogDir() + "/latest_jar_executor.log");
         Thread javaGUIThread = new Thread(() -> {
             try {
 
-                logStartInfo(bridge, "Java GUI");
+                logStartInfo(bridge, "Jar Executor");
 
                 // env
                 setEnv(config, bridge, true);
@@ -291,8 +287,8 @@ public class FCLauncher {
                 bridge.getCallback().onLog("Working directory: " + config.getWorkingDir());
                 bridge.chdir(config.getWorkingDir());
 
-                // launch java gui
-                launch(config, bridge, "Java GUI");
+                // launch jar executor
+                launch(config, bridge, "Jar Executor");
             } catch (IOException e) {
                 e.printStackTrace();
             }

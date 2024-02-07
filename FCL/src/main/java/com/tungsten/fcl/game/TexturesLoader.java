@@ -1,3 +1,20 @@
+/*
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 package com.tungsten.fcl.game;
 
 import static com.tungsten.fclcore.util.Lang.threadPool;
@@ -30,11 +47,12 @@ import android.graphics.Paint;
 import android.graphics.drawable.BitmapDrawable;
 
 import com.tungsten.fcl.util.ResourceNotFoundError;
-import com.tungsten.fclauncher.FCLPath;
+import com.tungsten.fclauncher.utils.FCLPath;
 import com.tungsten.fclcore.auth.Account;
 import com.tungsten.fclcore.auth.ServerResponseMalformedException;
 import com.tungsten.fclcore.auth.microsoft.MicrosoftAccount;
 import com.tungsten.fclcore.auth.offline.OfflineAccount;
+import com.tungsten.fclcore.auth.offline.Skin;
 import com.tungsten.fclcore.auth.yggdrasil.Texture;
 import com.tungsten.fclcore.auth.yggdrasil.TextureModel;
 import com.tungsten.fclcore.auth.yggdrasil.TextureType;
@@ -85,16 +103,28 @@ public final class TexturesLoader {
         return TEXTURES_DIR.resolve(prefix).resolve(hash);
     }
 
-    public static LoadedTexture loadTexture(Texture texture) throws IOException {
-        if (StringUtils.isBlank(texture.getUrl())) {
-            if (texture.getImg() == null)
-                throw new IOException("Texture url is empty");
+    public static LoadedTexture loadTexture(Texture texture, OfflineAccount... accounts) throws Exception {
+        Map<String, String> metadata = texture.getMetadata();
+        if (metadata == null) {
+            metadata = emptyMap();
+        }
 
-            Map<String, String> metadata = texture.getMetadata();
-            if (metadata == null) {
-                metadata = emptyMap();
+        if (StringUtils.isBlank(texture.getUrl())) {
+            throw new IOException("Texture url is empty");
+        }
+
+        if (texture.getUrl().equals("offline") && accounts.length == 1) {
+            OfflineAccount account = accounts[0];
+            Skin.LoadedSkin loadedSkin = account.getSkin().load(account.getUsername()).run();
+            if (loadedSkin != null) {
+                Bitmap img = loadedSkin.getSkin() == null ? null : loadedSkin.getSkin().getImage();
+                if (img == null) {
+                    img = getDefaultSkin(TextureModel.detectUUID(account.getUUID())).getImage();
+                }
+                return new LoadedTexture(img, metadata);
+            } else {
+                return getDefaultSkin(TextureModel.detectUUID(account.getUUID()));
             }
-            return new LoadedTexture(texture.getImg(), metadata);
         }
 
         Path file = getTexturePath(texture);
@@ -120,43 +150,49 @@ public final class TexturesLoader {
             throw new IOException("Texture is malformed");
         }
 
-        Map<String, String> metadata = texture.getMetadata();
-        if (metadata == null) {
-            metadata = emptyMap();
-        }
         return new LoadedTexture(img, metadata);
     }
 
-    private static Bitmap loadCape(Texture texture) throws IOException {
+    private static Bitmap loadCape(Texture texture, OfflineAccount... accounts) throws Exception {
         if (StringUtils.isBlank(texture.getUrl())) {
-            return texture.getImg();
-        } else {
-            Path file = getTexturePath(texture);
-            if (!Files.isRegularFile(file)) {
-                // download it
-                try {
-                    new FileDownloadTask(new URL(texture.getUrl()), file.toFile()).run();
-                    LOG.info("Texture downloaded: " + texture.getUrl());
-                } catch (Exception e) {
-                    if (Files.isRegularFile(file)) {
-                        // concurrency conflict?
-                        LOG.log(Level.WARNING, "Failed to download texture " + texture.getUrl() + ", but the file is available", e);
-                    } else {
-                        throw new IOException("Failed to download texture " + texture.getUrl());
-                    }
+            throw new Exception("Texture url is empty");
+        }
+
+        if (texture.getUrl().equals("offline") && accounts.length == 1) {
+            OfflineAccount account = accounts[0];
+            Skin.LoadedSkin loadedSkin = account.getSkin().load(account.getUsername()).run();
+            if (loadedSkin != null) {
+                return loadedSkin.getSkin() == null ? null : loadedSkin.getCape().getImage();
+            } else {
+                return getDefaultSkin(TextureModel.detectUUID(account.getUUID())).getImage();
+            }
+        }
+
+        Path file = getTexturePath(texture);
+        if (!Files.isRegularFile(file)) {
+            // download it
+            try {
+                new FileDownloadTask(new URL(texture.getUrl()), file.toFile()).run();
+                LOG.info("Texture downloaded: " + texture.getUrl());
+            } catch (Exception e) {
+                if (Files.isRegularFile(file)) {
+                    // concurrency conflict?
+                    LOG.log(Level.WARNING, "Failed to download texture " + texture.getUrl() + ", but the file is available", e);
+                } else {
+                    throw new IOException("Failed to download texture " + texture.getUrl());
                 }
             }
-
-            Bitmap img;
-            try (InputStream in = Files.newInputStream(file)) {
-                img = BitmapFactory.decodeStream(in);
-            }
-            if (img == null) {
-                throw new IOException("Texture is malformed");
-            }
-
-            return img;
         }
+
+        Bitmap img;
+        try (InputStream in = Files.newInputStream(file)) {
+            img = BitmapFactory.decodeStream(in);
+        }
+        if (img == null) {
+            throw new IOException("Texture is malformed");
+        }
+
+        return img;
     }
     // ====
 
@@ -200,7 +236,7 @@ public final class TexturesLoader {
                         return CompletableFuture.supplyAsync(() -> {
                             try {
                                 return loadTexture(texture);
-                            } catch (IOException e) {
+                            } catch (Exception e) {
                                 LOG.log(Level.WARNING, "Failed to load texture " + texture.getUrl() + ", using fallback texture", e);
                                 return uuidFallback;
                             }
@@ -222,8 +258,11 @@ public final class TexturesLoader {
                         Texture texture = it.get();
                         return CompletableFuture.supplyAsync(() -> {
                             try {
+                                if (account instanceof OfflineAccount) {
+                                    return loadTexture(texture, (OfflineAccount) account);
+                                }
                                 return loadTexture(texture);
-                            } catch (IOException e) {
+                            } catch (Exception e) {
                                 LOG.log(Level.WARNING, "Failed to load texture " + texture.getUrl() + ", using fallback texture", e);
                                 return uuidFallback;
                             }
@@ -232,51 +271,6 @@ public final class TexturesLoader {
                         return CompletableFuture.completedFuture(uuidFallback);
                     }
                 }, uuidFallback);
-    }
-
-    public static ObjectBinding<Bitmap> skinBitmapBinding(Account account) {
-        Bitmap fallback = getDefaultSkin(TextureModel.detectUUID(account.getUUID())).getImage();
-        return BindingMapping.of(account.getTextures())
-                .map(textures -> textures
-                        .flatMap(it -> Optional.ofNullable(it.get(TextureType.SKIN)))
-                        .filter(it -> StringUtils.isNotBlank(it.getUrl())))
-                .asyncMap(it -> {
-                    if (it.isPresent()) {
-                        Texture texture = it.get();
-                        return CompletableFuture.supplyAsync(() -> {
-                            try {
-                                return loadTexture(texture).getImage();
-                            } catch (IOException e) {
-                                LOG.log(Level.WARNING, "Failed to load texture " + texture.getUrl() + ", using fallback texture", e);
-                                return fallback;
-                            }
-                        }, POOL);
-                    } else {
-                        return CompletableFuture.completedFuture(fallback);
-                    }
-                }, fallback);
-    }
-
-    public static ObjectBinding<Bitmap> capeBinding(Account account) {
-        return BindingMapping.of(account.getTextures())
-                .map(textures -> textures
-                        .flatMap(it -> Optional.ofNullable(it.get(TextureType.CAPE)))
-                        .filter(it -> StringUtils.isNotBlank(it.getUrl())))
-                .asyncMap(it -> {
-                    if (it.isPresent()) {
-                        Texture texture = it.get();
-                        return CompletableFuture.supplyAsync(() -> {
-                            try {
-                                return loadCape(texture);
-                            } catch (IOException e) {
-                                LOG.log(Level.WARNING, "Failed to load texture " + texture.getUrl() + ", using null", e);
-                                return null;
-                            }
-                        }, POOL);
-                    } else {
-                        return CompletableFuture.completedFuture(null);
-                    }
-                }, null);
     }
 
     public static ObjectBinding<Bitmap[]> textureBinding(Account account) {
@@ -293,15 +287,20 @@ public final class TexturesLoader {
                             Bitmap finalCape = null;
                             try {
                                 if (loadSkin) {
-                                    finalSkin = loadTexture(skin).getImage();
+                                    if (account instanceof OfflineAccount) {
+                                        finalSkin = loadTexture(skin, (OfflineAccount) account).getImage();
+                                        finalCape = loadCape(skin, (OfflineAccount) account);
+                                    } else {
+                                        finalSkin = loadTexture(skin).getImage();
+                                    }
                                 }
                                 if (loadCape) {
                                     finalCape = loadCape(cape);
                                 }
-                            } catch (IOException e) {
+                            } catch (Exception e) {
                                 LOG.log(Level.WARNING, "Failed to load texture, using default", e);
                             }
-                            return new Bitmap[] { finalSkin, finalCape};
+                            return new Bitmap[] { finalSkin, finalCape };
                         }, POOL);
                     } else {
                         return CompletableFuture.completedFuture(fallback);

@@ -1,3 +1,20 @@
+/*
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 package com.tungsten.fclcore.game;
 
 import static com.tungsten.fclcore.util.Logging.LOG;
@@ -48,7 +65,7 @@ public class DefaultGameRepository implements GameRepository {
 
     private File baseDirectory;
     protected Map<String, Version> versions;
-    private ConcurrentHashMap<File, Optional<String>> gameVersions = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<File, Optional<String>> gameVersions = new ConcurrentHashMap<>();
 
     public DefaultGameRepository(File baseDirectory) {
         this.baseDirectory = baseDirectory;
@@ -126,19 +143,13 @@ public class DefaultGameRepository implements GameRepository {
         // This implementation may cause multiple flows against the same version entering
         // this function, which is accepted because GameVersion::minecraftVersion should
         // be consistent.
-        File versionJar = getVersionJar(version);
-        if (gameVersions.containsKey(versionJar)) {
-            return gameVersions.get(versionJar);
-        } else {
+        return gameVersions.computeIfAbsent(getVersionJar(version), versionJar -> {
             Optional<String> gameVersion = GameVersion.minecraftVersion(versionJar);
-
             if (!gameVersion.isPresent()) {
                 LOG.warning("Cannot find out game version of " + version.getId() + ", primary jar: " + versionJar.toString() + ", jar exists: " + versionJar.exists());
             }
-
-            gameVersions.put(versionJar, gameVersion);
             return gameVersion;
-        }
+        });
     }
 
     @Override
@@ -168,7 +179,7 @@ public class DefaultGameRepository implements GameRepository {
         } catch (JsonParseException ignored) {
         }
 
-        LOG.warning("Cannot parse version json + " + file.toString() + "\n" + jsonText);
+        LOG.warning("Cannot parse version json: " + file.toString() + "\n" + jsonText);
         throw new JsonParseException("Version json incorrect");
     }
 

@@ -1,7 +1,25 @@
+/*
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 package com.tungsten.fclcore.mod;
 
 import com.tungsten.fclcore.util.Lang;
 
+import java.io.File;
 import java.util.List;
 
 public interface ModAdviser {
@@ -41,21 +59,21 @@ public interface ModAdviser {
             "optionsof.txt" /* OptiFine */,
             "journeymap" /* JourneyMap */,
             "optionsshaders.txt",
-            "mods/VoxelMods");
+            "mods" + File.separator + "VoxelMods");
 
-    static ModSuggestion suggestMod(String fileName, boolean isDirectory) {
+    static ModAdviser.ModSuggestion suggestMod(String fileName, boolean isDirectory) {
         if (match(MODPACK_BLACK_LIST, fileName, isDirectory))
-            return ModSuggestion.HIDDEN;
+            return ModAdviser.ModSuggestion.HIDDEN;
         if (match(MODPACK_SUGGESTED_BLACK_LIST, fileName, isDirectory))
-            return ModSuggestion.NORMAL;
+            return ModAdviser.ModSuggestion.NORMAL;
         else
-            return ModSuggestion.SUGGESTED;
+            return ModAdviser.ModSuggestion.SUGGESTED;
     }
 
     static boolean match(List<String> l, String fileName, boolean isDirectory) {
         for (String s : l)
             if (isDirectory) {
-                if (fileName.startsWith(s + "/"))
+                if (fileName.startsWith(s + File.separator))
                     return true;
             } else {
                 if (s.startsWith("regex:")) {

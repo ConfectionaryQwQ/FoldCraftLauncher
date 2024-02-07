@@ -1,3 +1,20 @@
+/*
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 package com.tungsten.fclcore.util.io;
 
 import static com.tungsten.fclcore.util.Pair.pair;
@@ -7,17 +24,19 @@ import static com.tungsten.fclcore.util.StringUtils.substringAfterLast;
 
 import java.io.*;
 import java.net.*;
-import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.Map.Entry;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
+import com.tungsten.fclauncher.utils.FCLPath;
+import com.tungsten.fclcore.R;
 import com.tungsten.fclcore.util.Pair;
 
 public final class NetworkUtils {
     public static final String PARAMETER_SEPARATOR = "&";
     public static final String NAME_VALUE_SEPARATOR = "=";
+    private static final int TIME_OUT = 8000;
 
     private NetworkUtils() {
     }
@@ -68,11 +87,23 @@ public final class NetworkUtils {
         return result;
     }
 
+    private static boolean endsWithDomainSuffix(String host, String domainSuffix) {
+        return host.endsWith(domainSuffix.toLowerCase());
+    }
+
     public static URLConnection createConnection(URL url) throws IOException {
         URLConnection connection = url.openConnection();
+        String host = url.getHost().toLowerCase();
+        if (endsWithDomainSuffix(host, "d.pcs.baidu.com") || endsWithDomainSuffix(host, "baidupcs.com")) {
+            // Docs: https://alist.nn.ci/zh/guide/drivers/baidu.html
+            connection.setRequestProperty("User-Agent", "pan.baidu.com");
+        } else {
+            // Default
+            connection.setRequestProperty("User-Agent", "FCL/" + FCLPath.CONTEXT.getString(R.string.app_version));
+        }
         connection.setUseCaches(false);
-        connection.setConnectTimeout(5000);
-        connection.setReadTimeout(5000);
+        connection.setConnectTimeout(TIME_OUT);
+        connection.setReadTimeout(TIME_OUT);
         connection.setRequestProperty("Accept-Language", Locale.getDefault().toString());
         return connection;
     }
@@ -116,7 +147,7 @@ public final class NetworkUtils {
     /**
      * This method is a work-around that aims to solve problem when "Location" in
      * stupid server's response is not encoded.
-     * 
+     *
      * @see <a href="https://github.com/curl/curl/issues/473">Issue with libcurl</a>
      * @param conn the stupid http connection.
      * @return manually redirected http connection.
@@ -127,8 +158,8 @@ public final class NetworkUtils {
         while (true) {
 
             conn.setUseCaches(false);
-            conn.setConnectTimeout(5000);
-            conn.setReadTimeout(5000);
+            conn.setConnectTimeout(TIME_OUT);
+            conn.setReadTimeout(TIME_OUT);
             conn.setInstanceFollowRedirects(false);
             Map<String, List<String>> properties = conn.getRequestProperties();
             String method = conn.getRequestMethod();
@@ -158,13 +189,13 @@ public final class NetworkUtils {
     public static String doGet(URL url) throws IOException {
         HttpURLConnection con = createHttpConnection(url);
         con = resolveConnection(con);
-        return IOUtils.readFullyAsString(con.getInputStream(), StandardCharsets.UTF_8);
+        return IOUtils.readFullyAsString(con.getInputStream());
     }
 
     public static String doPost(URL u, Map<String, String> params) throws IOException {
         StringBuilder sb = new StringBuilder();
         if (params != null) {
-            for (Entry<String, String> e : params.entrySet())
+            for (Map.Entry<String, String> e : params.entrySet())
                 sb.append(e.getKey()).append("=").append(e.getValue()).append("&");
             sb.deleteCharAt(sb.length() - 1);
         }
@@ -192,13 +223,13 @@ public final class NetworkUtils {
     public static String readData(HttpURLConnection con) throws IOException {
         try {
             try (InputStream stdout = con.getInputStream()) {
-                return IOUtils.readFullyAsString(stdout, UTF_8);
+                return IOUtils.readFullyAsString("gzip".equals(con.getContentEncoding()) ? IOUtils.wrapFromGZip(stdout) : stdout);
             }
         } catch (IOException e) {
             try (InputStream stderr = con.getErrorStream()) {
                 if (stderr == null)
                     throw e;
-                return IOUtils.readFullyAsString(stderr, UTF_8);
+                return IOUtils.readFullyAsString("gzip".equals(con.getContentEncoding()) ? IOUtils.wrapFromGZip(stderr) : stderr);
             }
         }
     }

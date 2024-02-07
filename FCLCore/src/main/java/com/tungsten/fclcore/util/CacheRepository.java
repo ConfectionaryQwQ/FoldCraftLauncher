@@ -1,3 +1,20 @@
+/*
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 package com.tungsten.fclcore.util;
 
 import static com.tungsten.fclcore.util.Logging.LOG;
@@ -12,14 +29,14 @@ import com.tungsten.fclcore.util.io.IOUtils;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.OutputStream;
-import java.io.RandomAccessFile;
 import java.net.URLConnection;
+import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -38,7 +55,7 @@ public class CacheRepository {
     private Path cacheDirectory;
     private Path indexFile;
     private Map<String, ETagItem> index;
-    private Map<String, Storage> storages = new HashMap<>();
+    private final Map<String, Storage> storages = new HashMap<>();
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
 
     public void changeDirectory(Path commonDir) {
@@ -53,7 +70,7 @@ public class CacheRepository {
             }
 
             if (Files.isRegularFile(indexFile)) {
-                ETagIndex raw = JsonUtils.GSON.fromJson(FileUtils.readText(indexFile.toFile()), ETagIndex.class);
+                ETagIndex raw = JsonUtils.GSON.fromJson(FileUtils.readText(indexFile), ETagIndex.class);
                 if (raw == null)
                     index = new HashMap<>();
                 else
@@ -95,7 +112,7 @@ public class CacheRepository {
         Path file = getFile(algorithm, hash);
         if (Files.exists(file)) {
             try {
-                return Hex.encodeHex(DigestUtils.digest(algorithm, file)).equalsIgnoreCase(hash);
+                return DigestUtils.digestToString(algorithm, file).equalsIgnoreCase(hash);
             } catch (IOException e) {
                 return false;
             }
@@ -107,12 +124,12 @@ public class CacheRepository {
     public void tryCacheFile(Path path, String algorithm, String hash) throws IOException {
         Path cache = getFile(algorithm, hash);
         if (Files.isRegularFile(cache)) return;
-        FileUtils.copyFile(path.toFile(), cache.toFile());
+        FileUtils.copyFile(path, cache);
     }
 
     public Path cacheFile(Path path, String algorithm, String hash) throws IOException {
         Path cache = getFile(algorithm, hash);
-        FileUtils.copyFile(path.toFile(), cache.toFile());
+        FileUtils.copyFile(path, cache);
         return cache;
     }
 
@@ -123,7 +140,7 @@ public class CacheRepository {
         if (original != null && Files.exists(original)) {
             if (hash != null) {
                 try {
-                    String checksum = Hex.encodeHex(DigestUtils.digest(algorithm, original));
+                    String checksum = DigestUtils.digestToString(algorithm, original);
                     if (checksum.equalsIgnoreCase(hash))
                         return Optional.of(restore(original, () -> cacheFile(original, algorithm, hash)));
                 } catch (IOException e) {
@@ -157,7 +174,7 @@ public class CacheRepository {
         if (StringUtils.isBlank(eTagItem.hash) || !fileExists(SHA1, eTagItem.hash)) throw new FileNotFoundException();
         Path file = getFile(SHA1, eTagItem.hash);
         if (Files.getLastModifiedTime(file).toMillis() != eTagItem.localLastModified) {
-            String hash = Hex.encodeHex(DigestUtils.digest(SHA1, file));
+            String hash = DigestUtils.digestToString(SHA1, file);
             if (!Objects.equals(hash, eTagItem.hash))
                 throw new IOException("This file is modified");
         }
@@ -192,7 +209,7 @@ public class CacheRepository {
 
     public void cacheRemoteFile(Path downloaded, URLConnection conn) throws IOException {
         cacheData(() -> {
-            String hash = Hex.encodeHex(DigestUtils.digest(SHA1, downloaded));
+            String hash = DigestUtils.digestToString(SHA1, downloaded);
             Path cached = cacheFile(downloaded, SHA1, hash);
             return new CacheResult(hash, cached);
         }, conn);
@@ -204,9 +221,9 @@ public class CacheRepository {
 
     public void cacheBytes(byte[] bytes, URLConnection conn) throws IOException {
         cacheData(() -> {
-            String hash = Hex.encodeHex(DigestUtils.digest(SHA1, bytes));
+            String hash = DigestUtils.digestToString(SHA1, bytes);
             Path cached = getFile(SHA1, hash);
-            FileUtils.writeBytes(cached.toFile(), bytes);
+            FileUtils.writeBytes(cached, bytes);
             return new CacheResult(hash, cached);
         }, conn);
     }
@@ -271,15 +288,16 @@ public class CacheRepository {
     }
 
     public void saveETagIndex() throws IOException {
-        try (RandomAccessFile file = new RandomAccessFile(indexFile.toFile(), "rw"); FileChannel channel = file.getChannel()) {
+        if (!indexFile.toFile().exists())
+            indexFile.toFile().createNewFile();
+        try (FileChannel channel = FileChannel.open(indexFile, StandardOpenOption.READ, StandardOpenOption.WRITE)) {
             FileLock lock = channel.lock();
             try {
                 ETagIndex indexOnDisk = JsonUtils.fromMaybeMalformedJson(new String(IOUtils.readFullyWithoutClosing(Channels.newInputStream(channel)), UTF_8), ETagIndex.class);
                 Map<String, ETagItem> newIndex = joinETagIndexes(indexOnDisk == null ? null : indexOnDisk.eTag, index.values());
                 channel.truncate(0);
-                OutputStream os = Channels.newOutputStream(channel);
                 ETagIndex writeTo = new ETagIndex(newIndex.values());
-                IOUtils.write(JsonUtils.GSON.toJson(writeTo).getBytes(UTF_8), os);
+                channel.write(ByteBuffer.wrap(JsonUtils.GSON.toJson(writeTo).getBytes(UTF_8)));
                 this.index = newIndex;
             } finally {
                 lock.release();
@@ -287,7 +305,7 @@ public class CacheRepository {
         }
     }
 
-    private class ETagIndex {
+    private static final class ETagIndex {
         private final Collection<ETagItem> eTag;
 
         public ETagIndex() {
@@ -299,7 +317,7 @@ public class CacheRepository {
         }
     }
 
-    private class ETagItem {
+    private static final class ETagItem {
         private final String url;
         private final String eTag;
         private final String hash;
@@ -356,7 +374,7 @@ public class CacheRepository {
     /**
      * Universal cache
      */
-    public static class Storage {
+    public static final class Storage {
         private final String name;
         private Map<String, Object> storage;
         private final ReadWriteLock lock = new ReentrantReadWriteLock();
@@ -394,7 +412,7 @@ public class CacheRepository {
             try {
                 indexFile = cacheDirectory.resolve(name + ".json");
                 if (Files.isRegularFile(indexFile)) {
-                    joinEntries(JsonUtils.fromNonNullJson(FileUtils.readText(indexFile.toFile()), new TypeToken<Map<String, Object>>() {
+                    joinEntries(JsonUtils.fromNonNullJson(FileUtils.readText(indexFile), new TypeToken<Map<String, Object>>() {
                     }.getType()));
                 }
             } catch (IOException | JsonParseException e) {
@@ -405,7 +423,7 @@ public class CacheRepository {
         }
 
         public void saveToFile() {
-            try (RandomAccessFile file = new RandomAccessFile(indexFile.toFile(), "rw"); FileChannel channel = file.getChannel()) {
+            try (FileChannel channel = FileChannel.open(indexFile, StandardOpenOption.READ, StandardOpenOption.WRITE)) {
                 FileLock lock = channel.lock();
                 try {
                     Map<String, Object> indexOnDisk = JsonUtils.fromMaybeMalformedJson(new String(IOUtils.readFullyWithoutClosing(Channels.newInputStream(channel)), UTF_8), new TypeToken<Map<String, Object>>() {
@@ -413,8 +431,7 @@ public class CacheRepository {
                     if (indexOnDisk == null) indexOnDisk = new HashMap<>();
                     indexOnDisk.putAll(storage);
                     channel.truncate(0);
-                    OutputStream os = Channels.newOutputStream(channel);
-                    IOUtils.write(JsonUtils.GSON.toJson(storage).getBytes(UTF_8), os);
+                    channel.write(ByteBuffer.wrap(JsonUtils.GSON.toJson(storage).getBytes(UTF_8)));
                     this.storage = indexOnDisk;
                 } finally {
                     lock.release();

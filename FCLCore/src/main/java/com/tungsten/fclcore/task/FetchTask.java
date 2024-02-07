@@ -1,3 +1,20 @@
+/*
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 package com.tungsten.fclcore.task;
 
 import static com.tungsten.fclcore.util.Lang.threadPool;
@@ -221,8 +238,8 @@ public abstract class FetchTask<T> extends Task<T> {
         NOT_CHECK_E_TAG,
         CACHED
     }
-    
-    protected class DownloadState {
+
+    protected static final class DownloadState {
         private final int startPosition;
         private final int endPosition;
         private final int currentPosition;
@@ -255,9 +272,7 @@ public abstract class FetchTask<T> extends Task<T> {
         }
     }
 
-    protected class DownloadMission {
-
-
+    protected static final class DownloadMission {
 
     }
 
@@ -286,9 +301,15 @@ public abstract class FetchTask<T> extends Task<T> {
         concurrency = Math.max(concurrency, 1);
         synchronized (Schedulers.class) {
             downloadExecutorConcurrency = concurrency;
-            if (DOWNLOAD_EXECUTOR != null) {
-                DOWNLOAD_EXECUTOR.setCorePoolSize(concurrency);
-                DOWNLOAD_EXECUTOR.setMaximumPoolSize(concurrency);
+            ThreadPoolExecutor downloadExecutor = DOWNLOAD_EXECUTOR;
+            if (downloadExecutor != null) {
+                if (downloadExecutor.getMaximumPoolSize() <= concurrency) {
+                    downloadExecutor.setMaximumPoolSize(concurrency);
+                    downloadExecutor.setCorePoolSize(concurrency);
+                } else {
+                    downloadExecutor.setCorePoolSize(concurrency);
+                    downloadExecutor.setMaximumPoolSize(concurrency);
+                }
             }
         }
     }

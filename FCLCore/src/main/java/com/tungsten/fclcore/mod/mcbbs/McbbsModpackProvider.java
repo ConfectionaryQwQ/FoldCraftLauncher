@@ -1,3 +1,20 @@
+/*
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 package com.tungsten.fclcore.mod.mcbbs;
 
 import com.google.gson.JsonParseException;
@@ -11,13 +28,13 @@ import com.tungsten.fclcore.mod.ModpackProvider;
 import com.tungsten.fclcore.mod.ModpackUpdateTask;
 import com.tungsten.fclcore.task.Task;
 import com.tungsten.fclcore.util.gson.JsonUtils;
-import com.tungsten.fclcore.util.io.IOUtils;
 
 import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
 import org.apache.commons.compress.archivers.zip.ZipFile;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 
@@ -54,8 +71,8 @@ public final class McbbsModpackProvider implements ModpackProvider {
         config.getManifest().injectLaunchOptions(builder);
     }
 
-    private static Modpack fromManifestFile(String json, Charset encoding) throws IOException, JsonParseException {
-        McbbsModpackManifest manifest = JsonUtils.fromNonNullJson(json, McbbsModpackManifest.class);
+    private static Modpack fromManifestFile(InputStream json, Charset encoding) throws IOException, JsonParseException {
+        McbbsModpackManifest manifest = JsonUtils.fromNonNullJsonFully(json, McbbsModpackManifest.class);
         return manifest.toModpack(encoding);
     }
 
@@ -63,11 +80,11 @@ public final class McbbsModpackProvider implements ModpackProvider {
     public Modpack readManifest(ZipFile zip, Path file, Charset encoding) throws IOException, JsonParseException {
         ZipArchiveEntry mcbbsPackMeta = zip.getEntry("mcbbs.packmeta");
         if (mcbbsPackMeta != null) {
-            return fromManifestFile(IOUtils.readFullyAsString(zip.getInputStream(mcbbsPackMeta)), encoding);
+            return fromManifestFile(zip.getInputStream(mcbbsPackMeta), encoding);
         }
         ZipArchiveEntry manifestJson = zip.getEntry("manifest.json");
         if (manifestJson != null) {
-            return fromManifestFile(IOUtils.readFullyAsString(zip.getInputStream(manifestJson)), encoding);
+            return fromManifestFile(zip.getInputStream(manifestJson), encoding);
         }
         throw new IOException("`mcbbs.packmeta` or `manifest.json` cannot be found");
     }

@@ -1,3 +1,20 @@
+/*
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 package com.tungsten.fclcore.game;
 
 import com.tungsten.fclauncher.FCLConfig;
@@ -18,16 +35,16 @@ public class LaunchOptions implements Serializable {
     private String versionName;
     private String versionType;
     private String profileName;
-    private List<String> gameArguments = new ArrayList<>();
-    private List<String> javaArguments = new ArrayList<>();
-    private List<String> javaAgents = new ArrayList<>(0);
+    private final List<String> gameArguments = new ArrayList<>();
+    private final List<String> overrideJavaArguments = new ArrayList<>();
+    private final List<String> javaArguments = new ArrayList<>();
+    private final List<String> javaAgents = new ArrayList<>(0);
     private Integer minMemory;
     private Integer maxMemory;
     private Integer metaspace;
     private Integer width;
     private Integer height;
     private String serverIp;
-    private ProcessPriority processPriority = ProcessPriority.NORMAL;
     private boolean beGesture;
     private FCLConfig.Renderer renderer;
 
@@ -74,6 +91,14 @@ public class LaunchOptions implements Serializable {
     @NotNull
     public List<String> getGameArguments() {
         return Collections.unmodifiableList(gameArguments);
+    }
+
+    /**
+     * The highest priority JVM arguments (overrides the version setting)
+     */
+    @NotNull
+    public List<String> getOverrideJavaArguments() {
+        return Collections.unmodifiableList(overrideJavaArguments);
     }
 
     /**
@@ -131,13 +156,6 @@ public class LaunchOptions implements Serializable {
      */
     public String getServerIp() {
         return serverIp;
-    }
-
-    /**
-     * Process priority
-     */
-    public ProcessPriority getProcessPriority() {
-        return processPriority;
     }
 
     /**
@@ -207,6 +225,13 @@ public class LaunchOptions implements Serializable {
         }
 
         /**
+         * The highest priority JVM arguments (overrides the version setting)
+         */
+        public List<String> getOverrideJavaArguments() {
+            return options.overrideJavaArguments;
+        }
+
+        /**
          * User custom additional java virtual machine command line arguments.
          */
         public List<String> getJavaArguments() {
@@ -262,13 +287,6 @@ public class LaunchOptions implements Serializable {
         }
 
         /**
-         * Process priority
-         */
-        public ProcessPriority getProcessPriority() {
-            return options.processPriority;
-        }
-
-        /**
          * BE Gesture
          */
         public boolean isBeGesture() {
@@ -313,6 +331,12 @@ public class LaunchOptions implements Serializable {
             return this;
         }
 
+        public Builder setOverrideJavaArguments(List<String> overrideJavaArguments) {
+            options.overrideJavaArguments.clear();
+            options.overrideJavaArguments.addAll(overrideJavaArguments);
+            return this;
+        }
+
         public Builder setJavaArguments(List<String> javaArguments) {
             options.javaArguments.clear();
             options.javaArguments.addAll(javaArguments);
@@ -352,11 +376,6 @@ public class LaunchOptions implements Serializable {
 
         public Builder setServerIp(String serverIp) {
             options.serverIp = serverIp;
-            return this;
-        }
-
-        public Builder setProcessPriority(@NotNull ProcessPriority processPriority) {
-            options.processPriority = processPriority;
             return this;
         }
 

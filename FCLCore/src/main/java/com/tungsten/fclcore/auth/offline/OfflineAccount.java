@@ -1,3 +1,20 @@
+/*
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 package com.tungsten.fclcore.auth.offline;
 
 import static com.tungsten.fclcore.util.Lang.mapOf;
@@ -13,8 +30,6 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 
 import static java.util.Objects.requireNonNull;
-
-import android.graphics.BitmapFactory;
 
 import com.tungsten.fclcore.auth.Account;
 import com.tungsten.fclcore.auth.AuthInfo;
@@ -51,6 +66,10 @@ public class OfflineAccount extends Account {
         }
     }
 
+    public AuthlibInjectorArtifactProvider getDownloader() {
+        return downloader;
+    }
+
     @Override
     public UUID getUUID() {
         return uuid;
@@ -66,6 +85,11 @@ public class OfflineAccount extends Account {
         return username;
     }
 
+    @Override
+    public String getIdentifier() {
+        return username + ":" + username;
+    }
+
     public Skin getSkin() {
         return skin;
     }
@@ -75,7 +99,7 @@ public class OfflineAccount extends Account {
         invalidate();
     }
 
-    private boolean loadAuthlibInjector(Skin skin) {
+    protected boolean loadAuthlibInjector(Skin skin) {
         if (skin == null) return false;
         if (skin.getType() == Skin.Type.DEFAULT) return false;
         TextureModel defaultModel = TextureModel.detectUUID(getUUID());
@@ -88,7 +112,8 @@ public class OfflineAccount extends Account {
 
     @Override
     public AuthInfo logIn() throws AuthenticationException {
-        AuthInfo authInfo = new AuthInfo(username, uuid, UUIDTypeAdapter.fromUUID(UUID.randomUUID()), "{}");
+        // Using "legacy" user type here because "mojang" user type may cause "invalid session token" or "disconnected" when connecting to a game server.
+        AuthInfo authInfo = new AuthInfo(username, uuid, UUIDTypeAdapter.fromUUID(UUID.randomUUID()), AuthInfo.USER_TYPE_MSA, "{}");
 
         if (loadAuthlibInjector(skin)) {
             CompletableFuture<AuthlibInjectorArtifactInfo> artifactTask = CompletableFuture.supplyAsync(() -> {
@@ -128,7 +153,7 @@ public class OfflineAccount extends Account {
         private YggdrasilServer server;
 
         public OfflineAuthInfo(AuthInfo authInfo, AuthlibInjectorArtifactInfo artifact) {
-            super(authInfo.getUsername(), authInfo.getUUID(), authInfo.getAccessToken(), authInfo.getUserProperties());
+            super(authInfo.getUsername(), authInfo.getUUID(), authInfo.getAccessToken(), USER_TYPE_MSA, authInfo.getUserProperties());
 
             this.artifact = artifact;
         }
@@ -140,7 +165,8 @@ public class OfflineAccount extends Account {
             server.start();
 
             try {
-                server.addCharacter(new YggdrasilServer.Character(uuid, username, skin.load(username).run()));
+                server.addCharacter(new YggdrasilServer.Character(uuid, username,
+                        skin != null ? skin.load(username).run() : null));
             } catch (IOException e) {
                 // ignore
             } catch (Exception e) {
@@ -164,7 +190,7 @@ public class OfflineAccount extends Account {
 
     @Override
     public AuthInfo playOffline() throws AuthenticationException {
-        return logIn();
+        return new AuthInfo(username, uuid, UUIDTypeAdapter.fromUUID(UUID.randomUUID()), AuthInfo.USER_TYPE_MSA, "{}");
     }
 
     @Override
@@ -178,21 +204,9 @@ public class OfflineAccount extends Account {
 
     @Override
     public ObjectBinding<Optional<Map<TextureType, Texture>>> getTextures() {
-        try {
-            Skin.LoadedSkin loadedSkin = skin.load(username).run();
-            Map<TextureType, Texture> map = new HashMap<>();
-            if (loadedSkin != null) {
-                map.put(TextureType.SKIN, new Texture(null, null, BitmapFactory.decodeStream(loadedSkin.getSkin().getInputStream())));
-                if (loadedSkin.getCape() != null) {
-                    map.put(TextureType.CAPE, new Texture(null, null, BitmapFactory.decodeStream(loadedSkin.getCape().getInputStream())));
-                }
-            } else {
-                map.put(TextureType.SKIN, new Texture(null, null, BitmapFactory.decodeStream(OfflineAccount.class.getResourceAsStream(TextureModel.detectUUID(uuid) == TextureModel.ALEX ? "/assets/img/alex.img" : "/assets/img/steve.png"))));
-            }
-            return Bindings.createObjectBinding(() -> Optional.of(map));
-        } catch (Exception e) {
-            return super.getTextures();
-        }
+        Map<TextureType, Texture> map = new HashMap<>();
+        map.put(TextureType.SKIN, new Texture("offline", null));
+        return Bindings.createObjectBinding(() -> Optional.of(map));
     }
 
     @Override
@@ -213,6 +227,6 @@ public class OfflineAccount extends Account {
         if (!(obj instanceof OfflineAccount))
             return false;
         OfflineAccount another = (OfflineAccount) obj;
-        return username.equals(another.username);
+        return isPortable() == another.isPortable() && username.equals(another.username);
     }
 }

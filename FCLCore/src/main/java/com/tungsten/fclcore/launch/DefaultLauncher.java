@@ -1,9 +1,28 @@
+/*
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 package com.tungsten.fclcore.launch;
 
 import static com.tungsten.fclcore.util.Lang.mapOf;
+import static com.tungsten.fclcore.util.Logging.LOG;
 import static com.tungsten.fclcore.util.Pair.pair;
 
 import android.content.Context;
+import android.os.Build;
 
 import com.google.gson.GsonBuilder;
 import com.tungsten.fclauncher.FCLConfig;
@@ -11,27 +30,28 @@ import com.tungsten.fclauncher.FCLauncher;
 import com.tungsten.fclauncher.bridge.FCLBridge;
 import com.tungsten.fclauncher.utils.Architecture;
 import com.tungsten.fclcore.auth.AuthInfo;
-import com.tungsten.fclauncher.FCLPath;
+import com.tungsten.fclauncher.utils.FCLPath;
 import com.tungsten.fclcore.game.Argument;
 import com.tungsten.fclcore.game.Arguments;
 import com.tungsten.fclcore.game.GameRepository;
 import com.tungsten.fclcore.game.JavaVersion;
 import com.tungsten.fclcore.game.LaunchOptions;
 import com.tungsten.fclcore.game.Version;
-import com.tungsten.fclcore.util.Logging;
 import com.tungsten.fclcore.util.StringUtils;
 import com.tungsten.fclcore.util.gson.UUIDTypeAdapter;
 import com.tungsten.fclcore.util.io.FileUtils;
 import com.tungsten.fclcore.util.io.IOUtils;
 import com.tungsten.fclcore.util.platform.CommandBuilder;
+import com.tungsten.fclcore.util.platform.OperatingSystem;
 import com.tungsten.fclcore.util.versioning.VersionNumber;
 
 import java.io.*;
-import java.nio.charset.StandardCharsets;
+import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.function.Supplier;
 import java.util.logging.Level;
+import java.util.stream.Collectors;
 
 public class DefaultLauncher extends Launcher {
 
@@ -44,71 +64,31 @@ public class DefaultLauncher extends Launcher {
 
         getCacioJavaArgs(res, version, options);
 
-        switch (options.getProcessPriority()) {
-            case HIGH:
-                res.add("nice", "-n", "-5");
-                break;
-            case NORMAL:
-                // do nothing
-                break;
-            case LOW:
-                res.add("nice", "-n", "5");
-                break;
-        }
-
-        res.addAllWithoutParsing(options.getJavaArguments());
-
-        // JVM Args
-        appendJvmArgs(res);
-
-        res.addDefault("-Dminecraft.client.jar=", repository.getVersionJar(version).toString());
-
-        // Using G1GC with its settings by default
-        if (options.getJava().getVersion() >= 8) {
-            boolean addG1Args = true;
-            for (String javaArg : options.getJavaArguments()) {
-                if ("-XX:-UseG1GC".equals(javaArg) || (javaArg.startsWith("-XX:+Use") && javaArg.endsWith("GC"))) {
-                    addG1Args = false;
-                    break;
-                }
-            }
-            if (addG1Args) {
-                res.addUnstableDefault("UnlockExperimentalVMOptions", true);
-                res.addUnstableDefault("UseG1GC", true);
-                res.addUnstableDefault("G1NewSizePercent", "20");
-                res.addUnstableDefault("G1ReservePercent", "20");
-                res.addUnstableDefault("MaxGCPauseMillis", "50");
-                res.addUnstableDefault("G1HeapRegionSize", "16m");
-            }
-        }
-
-        if (options.getMetaspace() != null && options.getMetaspace() > 0)
-            res.addDefault("-XX:MetaspaceSize=", options.getMetaspace() + "m");
-
-        res.addUnstableDefault("UseAdaptiveSizePolicy", false);
-        res.addUnstableDefault("OmitStackTraceInFastThrow", false);
-        res.addUnstableDefault("DontCompileHugeMethods", false);
-        res.addDefault("-Xmn", "128m");
-
-        // As 32-bit JVM allocate 320KB for stack by default rather than 64-bit version allocating 1MB,
-        // causing Minecraft 1.13 crashed accounting for java.lang.StackOverflowError.
-        if (Architecture.is32BitsDevice()) {
-            res.addDefault("-Xss", "1m");
-        }
+        res.addAllWithoutParsing(options.getOverrideJavaArguments());
 
         if (options.getMaxMemory() != null && options.getMaxMemory() > 0)
             res.addDefault("-Xmx", options.getMaxMemory() + "m");
 
-        if (options.getMinMemory() != null && options.getMinMemory() > 0)
+        if (options.getMinMemory() != null && options.getMinMemory() > 0
+                && (options.getMaxMemory() == null || options.getMinMemory() <= options.getMaxMemory()))
             res.addDefault("-Xms", options.getMinMemory() + "m");
 
-        res.addDefault("-Dfml.ignoreInvalidMinecraftCertificates=", "true");
-        res.addDefault("-Dfml.ignorePatchDiscrepancies=", "true");
+        if (options.getMetaspace() != null && options.getMetaspace() > 0)
+            res.addDefault("-XX:MetaspaceSize=", options.getMetaspace() + "m");
 
-        // Enable LWJGL debug mode
-        res.addDefault("-Dorg.lwjgl.util.Debug=", "true");
-        res.addDefault("-Dorg.lwjgl.util.DebugLoader=", "true");
-        res.addDefault("-Dorg.lwjgl.util.DebugFunctions=", "true");
+        res.addAllDefaultWithoutParsing(options.getJavaArguments());
+
+        Charset encoding = OperatingSystem.NATIVE_CHARSET;
+        String fileEncoding = res.addDefault("-Dfile.encoding=", encoding.name());
+        if (fileEncoding != null && !"-Dfile.encoding=COMPAT".equals(fileEncoding)) {
+            try {
+                encoding = Charset.forName(fileEncoding.substring("-Dfile.encoding=".length()));
+            } catch (Throwable ex) {
+                LOG.log(Level.WARNING, "Bad file encoding", ex);
+            }
+        }
+        res.addDefault("-Dsun.stdout.encoding=", encoding.name());
+        res.addDefault("-Dsun.stderr.encoding=", encoding.name());
 
         // Fix RCE vulnerability of log4j2
         res.addDefault("-Djava.rmi.server.useCodebaseOnly=", "true");
@@ -120,14 +100,49 @@ public class DefaultLauncher extends Launcher {
             res.addDefault("-Dlog4j.configurationFile=", getLog4jConfigurationFile().getAbsolutePath());
         }
 
-        JavaVersion javaVersion = options.getJava().getId() == 0 ? JavaVersion.getSuitableJavaVersion(version) : options.getJava();
-        if (javaVersion.getVersion() == JavaVersion.JAVA_VERSION_17) {
-            res.addDefault("-Dext.net.resolvPath=", FCLPath.JAVA_17_PATH + "/resolv.conf");
+        // Default JVM Args
+        appendJvmArgs(res);
+
+        res.addDefault("-Dminecraft.client.jar=", repository.getVersionJar(version).toString());
+
+        // Using G1GC with its settings by default
+//        if (options.getJava().getVersion() >= 8
+//                && res.noneMatch(arg -> "-XX:-UseG1GC".equals(arg) || (arg.startsWith("-XX:+Use") && arg.endsWith("GC")))) {
+//            res.addUnstableDefault("UnlockExperimentalVMOptions", true);
+//            res.addUnstableDefault("UseG1GC", true);
+//            res.addUnstableDefault("G1NewSizePercent", "20");
+//            res.addUnstableDefault("G1ReservePercent", "20");
+//            res.addUnstableDefault("MaxGCPauseMillis", "50");
+//            res.addUnstableDefault("G1HeapRegionSize", "32m");
+//        }
+//
+//        res.addUnstableDefault("UseAdaptiveSizePolicy", false);
+//        res.addUnstableDefault("OmitStackTraceInFastThrow", false);
+//        res.addUnstableDefault("DontCompileHugeMethods", false);
+
+        // As 32-bit JVM allocate 320KB for stack by default rather than 64-bit version allocating 1MB,
+        // causing Minecraft 1.13 crashed accounting for java.lang.StackOverflowError.
+        if (Architecture.is32BitsDevice()) {
+            res.addDefault("-Xss", "1m");
+        }
+
+        res.addDefault("-Dfml.ignoreInvalidMinecraftCertificates=", "true");
+        res.addDefault("-Dfml.ignorePatchDiscrepancies=", "true");
+
+        // LWJGL debug mode
+        // res.addDefault("-Dorg.lwjgl.util.Debug=", "true");
+        // res.addDefault("-Dorg.lwjgl.util.DebugLoader=", "true");
+        // res.addDefault("-Dorg.lwjgl.util.DebugFunctions=", "true");
+
+        // FCL specific args
+        JavaVersion javaVersion = options.getJava().isAuto() ? JavaVersion.getSuitableJavaVersion(version) : options.getJava();
+        if (javaVersion.getVersion() == JavaVersion.JAVA_VERSION_11 || javaVersion.getVersion() == JavaVersion.JAVA_VERSION_17 || javaVersion.getVersion() == JavaVersion.JAVA_VERSION_21) {
+            res.addDefault("-Dext.net.resolvPath=", javaVersion.getJavaPath(version) + "/resolv.conf");
         }
 
         res.addDefault("-Djava.io.tmpdir=", FCLPath.CACHE_DIR);
         res.addDefault("-Dos.name=", "Linux");
-        res.addDefault("-Dlwjgl.platform=", "FCL");
+        res.addDefault("-Dos.version=Android-", Build.VERSION.RELEASE);
         res.addDefault("-Dorg.lwjgl.opengl.libname=", "${gl_lib_name}");
         res.addDefault("-Dfml.earlyprogresswindow=", "false");
         res.addDefault("-Dwindow.width=", options.getWidth() + "");
@@ -135,6 +150,8 @@ public class DefaultLauncher extends Launcher {
         res.addDefault("-Duser.home=", options.getGameDir().getAbsolutePath());
         res.addDefault("-Duser.language=", System.getProperty("user.language"));
         res.addDefault("-Duser.timezone=", TimeZone.getDefault().getID());
+        res.addDefault("-Djna.boot.library.path=", context.getApplicationInfo().nativeLibraryDir);
+        res.addDefault("-Dorg.lwjgl.vulkan.libname=", "libvulkan.so");
 
         if (getInjectorArg() != null && options.isBeGesture()) {
             res.addDefault("-Dfcl.injector=", getInjectorArg());
@@ -145,11 +162,16 @@ public class DefaultLauncher extends Launcher {
             res.addDefault("-Dsort.patch=", "true");
         }
 
-        List<String> classpath = repository.getClasspath(version);
+        // Fix 1.16.x multiplayer
+        if (repository.getGameVersion(version).isPresent() && repository.getGameVersion(version).get().startsWith("1.16")) {
+            res.add("-javaagent:" + FCLPath.MULTIPLAYER_FIX_PATH);
+        }
 
-        File jar = repository.getVersionJar(version);
-        if (!jar.exists() || !jar.isFile())
-            throw new IOException("Minecraft jar does not exist");
+        Set<String> classpath = repository.getClasspath(version);
+
+        File jar = new File(repository.getVersionRoot(version.getId()), version.getId() + ".jar");
+//        if (!jar.exists() || !jar.isFile())
+//            throw new IOException("Minecraft jar does not exist");
         classpath.add(jar.getAbsolutePath());
 
         // Provided Minecraft arguments
@@ -158,9 +180,10 @@ public class DefaultLauncher extends Launcher {
         configuration.put("${classpath}", String.join(File.pathSeparator, classpath));
         configuration.put("${game_assets}", gameAssets.toAbsolutePath().toString());
         configuration.put("${assets_root}", gameAssets.toAbsolutePath().toString());
-        configuration.put("${natives_directory}", "${natives_directory}");
 
-        res.addAll(Arguments.parseArguments(version.getArguments().map(Arguments::getJvm).orElseGet(this::getDefaultJVMArguments), configuration));
+        configuration.put("${natives_directory}", "${natives_directory}");
+        List<String> jvmArgs = Arguments.parseArguments(version.getArguments().map(Arguments::getJvm).orElseGet(this::getDefaultJVMArguments), configuration);
+        res.addAll(jvmArgs.stream().filter(arg -> !arg.contains("-Djna.tmpdir=") && !arg.contains("-Dorg.lwjgl.system.SharedLibraryExtractPath=")).collect(Collectors.toList()));
         Arguments argumentsFromAuthInfo = authInfo.getLaunchArguments(options);
         if (argumentsFromAuthInfo != null && argumentsFromAuthInfo.getJvm() != null && !argumentsFromAuthInfo.getJvm().isEmpty())
             res.addAll(Arguments.parseArguments(argumentsFromAuthInfo.getJvm(), configuration));
@@ -183,10 +206,15 @@ public class DefaultLauncher extends Launcher {
 
         if (StringUtils.isNotBlank(options.getServerIp())) {
             String[] args = options.getServerIp().split(":");
-            res.add("--server");
-            res.add(args[0]);
-            res.add("--port");
-            res.add(args.length > 1 ? args[1] : "25565");
+            if (VersionNumber.compare(repository.getGameVersion(version).orElse("0.0"), "1.20") < 0) {
+                res.add("--server");
+                res.add(args[0]);
+                res.add("--port");
+                res.add(args.length > 1 ? args[1] : "25565");
+            } else {
+                res.add("--quickPlayMultiplayer");
+                res.add(args[0] + ":" + (args.length > 1 ? args[1] : "25565"));
+            }
         }
 
         res.addAllWithoutParsing(Arguments.parseStringArguments(options.getGameArguments(), configuration));
@@ -197,12 +225,13 @@ public class DefaultLauncher extends Launcher {
 
     public static void getCacioJavaArgs(CommandBuilder res, Version version, LaunchOptions options) {
         JavaVersion javaVersion;
-        if (options.getJava().getId() == 0) {
+        if (options.getJava().isAuto()) {
             javaVersion = JavaVersion.getSuitableJavaVersion(version);
         } else {
             javaVersion = options.getJava();
         }
         boolean isJava8 = javaVersion.getVersion() == JavaVersion.JAVA_VERSION_8;
+        boolean isJava11 = javaVersion.getVersion() == JavaVersion.JAVA_VERSION_11;
 
         res.addDefault("-Djava.awt.headless=", "false");
         res.addDefault("-Dcacio.managed.screensize=", options.getWidth() + "x" + options.getHeight());
@@ -237,7 +266,7 @@ public class DefaultLauncher extends Launcher {
 
         StringBuilder cacioClasspath = new StringBuilder();
         cacioClasspath.append("-Xbootclasspath/").append(isJava8 ? "p" : "a");
-        File cacioDir = new File(isJava8 ? FCLPath.CACIOCAVALLO_8_DIR : FCLPath.CACIOCAVALLO_17_DIR);
+        File cacioDir = new File(isJava8 ? FCLPath.CACIOCAVALLO_8_DIR : isJava11 ? FCLPath.CACIOCAVALLO_11_DIR : FCLPath.CACIOCAVALLO_17_DIR);
         if (cacioDir.exists() && cacioDir.isDirectory()) {
             for (File file : Objects.requireNonNull(cacioDir.listFiles())) {
                 if (file.getName().endsWith(".jar")) {
@@ -250,7 +279,7 @@ public class DefaultLauncher extends Launcher {
 
     public String getInjectorArg() {
         try {
-            String map = IOUtils.readFullyAsString(DefaultLauncher.class.getResourceAsStream("/assets/map.json"), StandardCharsets.UTF_8);
+            String map = IOUtils.readFullyAsString(DefaultLauncher.class.getResourceAsStream("/assets/map.json"));
             InjectorMap injectorMap = new GsonBuilder()
                     .setPrettyPrinting()
                     .create()
@@ -277,7 +306,7 @@ public class DefaultLauncher extends Launcher {
                     .findFirst();
             return mapInfo.map(it -> it.getArgument().getArgument(version)).orElse(null);
         } catch (IOException e) {
-            Logging.LOG.log(Level.WARNING, "Failed to get game map", e);
+            LOG.log(Level.WARNING, "Failed to get game map", e);
             return null;
         }
     }
@@ -316,7 +345,7 @@ public class DefaultLauncher extends Launcher {
     }
 
     private boolean isUsingLog4j() {
-        return VersionNumber.VERSION_COMPARATOR.compare(repository.getGameVersion(version).orElse("1.7"), "1.7") >= 0;
+        return VersionNumber.compare(repository.getGameVersion(version).orElse("1.7"), "1.7") >= 0;
     }
 
     public File getLog4jConfigurationFile() {
@@ -326,7 +355,7 @@ public class DefaultLauncher extends Launcher {
     public void extractLog4jConfigurationFile() throws IOException {
         File targetFile = getLog4jConfigurationFile();
         InputStream source;
-        if (VersionNumber.VERSION_COMPARATOR.compare(repository.getGameVersion(version).orElse("0.0"), "1.12") < 0) {
+        if (VersionNumber.compare(repository.getGameVersion(version).orElse("0.0"), "1.12") < 0) {
             source = DefaultLauncher.class.getResourceAsStream("/assets/game/log4j2-1.7.xml");
         } else {
             source = DefaultLauncher.class.getResourceAsStream("/assets/game/log4j2-1.12.xml");
@@ -368,7 +397,6 @@ public class DefaultLauncher extends Launcher {
     public FCLBridge launch() throws IOException, InterruptedException {
         final CommandBuilder command = generateCommandLine();
 
-        // To guarantee that when failed to generate launch command line, we will not call pre-launch command
         List<String> rawCommandLine = command.asList();
 
         if (rawCommandLine.stream().anyMatch(StringUtils::isBlank)) {
@@ -382,12 +410,14 @@ public class DefaultLauncher extends Launcher {
         String[] finalArgs = rawCommandLine.toArray(new String[0]);
 
         FCLConfig.Renderer renderer = options.getRenderer();
-        FCLConfig config = new FCLConfig(context,
+        FCLConfig config = new FCLConfig(
+                context,
                 FCLPath.LOG_DIR,
-                options.getJava().getVersion() == 8 ? FCLPath.JAVA_8_PATH : FCLPath.JAVA_17_PATH,
+                options.getJava().getJavaPath(version),
                 repository.getRunDirectory(version.getId()).getAbsolutePath(),
                 renderer,
-                finalArgs);
+                finalArgs
+        );
         return FCLauncher.launchMinecraft(config);
     }
 }

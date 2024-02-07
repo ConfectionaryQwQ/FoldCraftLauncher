@@ -2,6 +2,8 @@ package com.tungsten.fclcore.download;
 
 import android.app.Service;
 import android.content.Intent;
+import android.os.Environment;
+import android.os.Handler;
 import android.os.IBinder;
 
 import androidx.annotation.Nullable;
@@ -33,13 +35,16 @@ public class ProcessService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         String[] command = intent.getExtras().getStringArray("command");
+        int java = intent.getExtras().getInt("java");
+        String jre = "jre" + java;
         FCLConfig config = new FCLConfig(
                 getApplicationContext(),
-                getApplicationContext().getExternalFilesDir("log").getAbsolutePath(),
-                getApplicationContext().getDir("runtime", 0).getAbsolutePath() + "/java/jre8",
+                Environment.getExternalStorageDirectory().getAbsolutePath() + "/FCL/log",
+                getApplicationContext().getDir("runtime", 0).getAbsolutePath() + "/java/" + jre,
                 getApplicationContext().getCacheDir() + "/fclauncher",
                 null,
-                command);
+                command
+        );
         startProcess(config);
         return super.onStartCommand(intent, flags, startId);
     }
@@ -78,7 +83,8 @@ public class ProcessService extends Service {
                 sendCode(code);
             }
         };
-        bridge.execute(null, callback);
+        Handler handler = new Handler();
+        handler.postDelayed(() -> bridge.execute(null, callback), 1000);
     }
 
     private void sendCode(int code) {

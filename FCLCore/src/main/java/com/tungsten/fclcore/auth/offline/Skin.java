@@ -1,3 +1,20 @@
+/*
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 package com.tungsten.fclcore.auth.offline;
 
 import static com.tungsten.fclcore.util.Lang.mapOf;
@@ -27,13 +44,21 @@ import java.util.Collections;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 
 public class Skin {
 
     public enum Type {
         DEFAULT,
-        STEVE,
         ALEX,
+        ARI,
+        EFE,
+        KAI,
+        MAKENA,
+        NOOR,
+        STEVE,
+        SUNNY,
+        ZURI,
         LOCAL_FILE,
         LITTLE_SKIN,
         CUSTOM_SKIN_LOADER_API,
@@ -43,10 +68,24 @@ public class Skin {
             switch (type) {
                 case "default":
                     return DEFAULT;
-                case "steve":
-                    return STEVE;
                 case "alex":
                     return ALEX;
+                case "ari":
+                    return ARI;
+                case "efe":
+                    return EFE;
+                case "kai":
+                    return KAI;
+                case "makena":
+                    return MAKENA;
+                case "noor":
+                    return NOOR;
+                case "steve":
+                    return STEVE;
+                case "sunny":
+                    return SUNNY;
+                case "zuri":
+                    return ZURI;
                 case "local_file":
                     return LOCAL_FILE;
                 case "little_skin":
@@ -59,6 +98,12 @@ public class Skin {
                     return null;
             }
         }
+    }
+
+    private static Function<Type, InputStream> defaultSkinLoader = null;
+
+    public static void registerDefaultSkinLoader(Function<Type, InputStream> defaultSkinLoader0) {
+        defaultSkinLoader = defaultSkinLoader0;
     }
 
     private final Type type;
@@ -99,10 +144,19 @@ public class Skin {
         switch (type) {
             case DEFAULT:
                 return Task.supplyAsync(() -> null);
-            case STEVE:
-                return Task.supplyAsync(() -> new LoadedSkin(TextureModel.STEVE, Texture.loadTexture(Skin.class.getResourceAsStream("/assets/img/steve.png")), null));
             case ALEX:
-                return Task.supplyAsync(() -> new LoadedSkin(TextureModel.ALEX, Texture.loadTexture(Skin.class.getResourceAsStream("/assets/img/alex.png")), null));
+            case ARI:
+            case EFE:
+            case KAI:
+            case MAKENA:
+            case NOOR:
+            case STEVE:
+            case SUNNY:
+            case ZURI:
+                if (defaultSkinLoader == null) {
+                    return Task.supplyAsync(() -> null);
+                }
+                return Task.supplyAsync(() -> new LoadedSkin(TextureModel.STEVE, Texture.loadTexture(defaultSkinLoader.apply(type)), null));
             case LOCAL_FILE:
                 return Task.supplyAsync(() -> {
                     Texture skin = null, cape = null;

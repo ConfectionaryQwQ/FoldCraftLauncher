@@ -1,3 +1,20 @@
+/*
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 package com.tungsten.fcl.setting;
 
 import static com.tungsten.fcl.setting.ConfigHolder.config;
@@ -6,7 +23,7 @@ import static com.tungsten.fclcore.fakefx.collections.FXCollections.observableAr
 
 import com.tungsten.fcl.R;
 import com.tungsten.fcl.util.WeakListenerHolder;
-import com.tungsten.fclauncher.FCLPath;
+import com.tungsten.fclauncher.utils.FCLPath;
 import com.tungsten.fclcore.event.EventBus;
 import com.tungsten.fclcore.event.RefreshedVersionsEvent;
 import com.tungsten.fclcore.fakefx.beans.Observable;
@@ -16,14 +33,15 @@ import com.tungsten.fclcore.fakefx.beans.property.ReadOnlyListWrapper;
 import com.tungsten.fclcore.fakefx.beans.property.ReadOnlyStringProperty;
 import com.tungsten.fclcore.fakefx.beans.property.ReadOnlyStringWrapper;
 import com.tungsten.fclcore.fakefx.beans.property.SimpleObjectProperty;
+import com.tungsten.fclcore.fakefx.collections.FXCollections;
 import com.tungsten.fclcore.fakefx.collections.ObservableList;
 
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.TreeMap;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
 
 public final class Profiles {
 
@@ -103,8 +121,11 @@ public final class Profiles {
         if (!initialized)
             return;
         // update storage
-        config().getConfigurations().clear();
-        config().getConfigurations().putAll(profiles.stream().collect(Collectors.toMap(Profile::getName, it -> it)));
+        TreeMap<String, Profile> newConfigurations = new TreeMap<>();
+        for (Profile profile : profiles) {
+            newConfigurations.put(profile.getName(), profile);
+        }
+        config().getConfigurations().setValue(FXCollections.observableMap(newConfigurations));
     }
 
     /**

@@ -1,3 +1,20 @@
+/*
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 package com.tungsten.fclcore.mod.curse;
 
 import com.google.gson.JsonParseException;
@@ -119,14 +136,27 @@ public final class CurseCompletionTask extends Task<Void> {
                         .collect(Collectors.toList()));
         FileUtils.writeText(new File(root, "manifest.json"), JsonUtils.GSON.toJson(newManifest));
 
+        File resourcePacks = new File(repository.getVersionRoot(modManager.getVersion()), "resourcepacks");
         for (CurseManifestFile file : newManifest.getFiles())
             if (StringUtils.isNotBlank(file.getFileName())) {
-                if (!modManager.hasSimpleMod(file.getFileName())) {
-                    FileDownloadTask task = new FileDownloadTask(file.getUrl(), modManager.getSimpleModPath(file.getFileName()).toFile());
-                    task.setCacheRepository(dependency.getCacheRepository());
-                    task.setCaching(true);
-                    dependencies.add(task.withCounter("fcl.modpack.download"));
+                RemoteMod mod = CurseForgeRemoteModRepository.MODS.getModById(Integer.toString(file.getProjectID()));
+                File target;
+                if (((CurseAddon) mod.getData()).getClassId() == 12) {
+                    target = new File(resourcePacks, file.getFileName());
+                    if (target.exists()) {
+                        continue;
+                    }
+                } else {
+                    if (modManager.hasSimpleMod(file.getFileName())) {
+                        continue;
+                    }
+                    target = modManager.getSimpleModPath(file.getFileName()).toFile();
                 }
+
+                FileDownloadTask task = new FileDownloadTask(file.getUrl(), target);
+                task.setCacheRepository(dependency.getCacheRepository());
+                task.setCaching(true);
+                dependencies.add(task.withCounter("fcl.modpack.download"));
             }
 
         if (!dependencies.isEmpty()) {

@@ -1,7 +1,24 @@
+/*
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 package com.tungsten.fclcore.util.io;
 
 import java.io.*;
-import java.nio.charset.Charset;
+import java.util.zip.GZIPInputStream;
 
 /**
  * This utility class consists of some util methods operating on InputStream/OutputStream.
@@ -21,9 +38,15 @@ public final class IOUtils {
      * @throws IOException if an I/O error occurs.
      */
     public static byte[] readFullyWithoutClosing(InputStream stream) throws IOException {
-        ByteArrayOutputStream result = new ByteArrayOutputStream();
+        ByteArrayOutputStream result = new ByteArrayOutputStream(Math.max(stream.available(), 32));
         copyTo(stream, result);
         return result.toByteArray();
+    }
+
+    public static String readFullyAsStringWithClosing(InputStream stream) throws IOException {
+        ByteArrayOutputStream result = new ByteArrayOutputStream(Math.max(stream.available(), 32));
+        copyTo(stream, result);
+        return result.toString("UTF-8");
     }
 
     /**
@@ -35,7 +58,7 @@ public final class IOUtils {
      */
     public static ByteArrayOutputStream readFully(InputStream stream) throws IOException {
         try (InputStream is = stream) {
-            ByteArrayOutputStream result = new ByteArrayOutputStream();
+            ByteArrayOutputStream result = new ByteArrayOutputStream(Math.max(is.available(), 32));
             copyTo(is, result);
             return result;
         }
@@ -49,18 +72,6 @@ public final class IOUtils {
         return readFully(stream).toString("UTF-8");
     }
 
-    public static String readFullyAsString(InputStream stream, Charset charset) throws IOException {
-        return readFully(stream).toString(charset.name());
-    }
-
-    public static void write(String text, OutputStream outputStream) throws IOException {
-        write(text.getBytes(), outputStream);
-    }
-
-    public static void write(byte[] bytes, OutputStream outputStream) throws IOException {
-        copyTo(new ByteArrayInputStream(bytes), outputStream);
-    }
-
     public static void copyTo(InputStream src, OutputStream dest) throws IOException {
         copyTo(src, dest, new byte[DEFAULT_BUFFER_SIZE]);
     }
@@ -72,5 +83,9 @@ public final class IOUtils {
                 break;
             dest.write(buf, 0, len);
         }
+    }
+
+    public static InputStream wrapFromGZip(InputStream inputStream) throws IOException {
+        return new GZIPInputStream(inputStream);
     }
 }

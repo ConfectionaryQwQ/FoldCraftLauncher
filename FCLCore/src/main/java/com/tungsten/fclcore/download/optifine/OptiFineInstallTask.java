@@ -1,3 +1,20 @@
+/*
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 package com.tungsten.fclcore.download.optifine;
 
 import static com.tungsten.fclcore.util.Lang.getOrDefault;
@@ -7,7 +24,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
 
-import com.tungsten.fclauncher.FCLPath;
+import com.tungsten.fclauncher.utils.FCLPath;
 import com.tungsten.fclcore.download.DefaultDependencyManager;
 import com.tungsten.fclcore.download.LibraryAnalyzer;
 import com.tungsten.fclcore.download.ProcessService;
@@ -143,29 +160,7 @@ public final class OptiFineInstallTask extends Task<Version> {
                         dest.toString(),
                         gameRepository.getLibraryFile(version, optiFineLibrary).toString()
                 };
-                int exitCode;
-                boolean listen = true;
-                while (listen) {
-                    if (((ActivityManager) FCLPath.CONTEXT.getSystemService(Context.ACTIVITY_SERVICE)).getRunningAppProcesses().size() == 1) {
-                        listen = false;
-                    }
-                }
-                CountDownLatch latch = new CountDownLatch(1);
-                SocketServer server = new SocketServer("127.0.0.1", ProcessService.PROCESS_SERVICE_PORT, (server1, msg) -> {
-                    server1.setResult(msg);
-                    server1.stop();
-                    latch.countDown();
-                });
-                Intent service = new Intent(FCLPath.CONTEXT, ProcessService.class);
-                Bundle bundle = new Bundle();
-                bundle.putStringArray("command", command);
-                service.putExtras(bundle);
-                FCLPath.CONTEXT.startService(service);
-                server.start();
-                latch.await();
-                exitCode = Integer.parseInt((String) server.getResult());
-                if (exitCode != 0)
-                    throw new IOException("OptiFine patcher failed, command: " + new CommandBuilder().addAll(Arrays.asList(command)));
+                runJVMProcess(command, 8);
             } else {
                 FileUtils.copyFile(dest, gameRepository.getLibraryFile(version, optiFineLibrary).toPath());
             }
@@ -225,6 +220,42 @@ public final class OptiFineInstallTask extends Task<Version> {
         ));
 
         dependencies.add(dependencyManager.checkLibraryCompletionAsync(getResult(), true));
+    }
+
+    private void runJVMProcess(String[] command, int java) throws Exception {
+        int exitCode;
+        boolean listen = true;
+        while (listen) {
+            if (((ActivityManager) FCLPath.CONTEXT.getSystemService(Context.ACTIVITY_SERVICE)).getRunningAppProcesses().size() == 1) {
+                listen = false;
+            }
+        }
+        CountDownLatch latch = new CountDownLatch(1);
+        SocketServer server = new SocketServer("127.0.0.1", ProcessService.PROCESS_SERVICE_PORT, (server1, msg) -> {
+            server1.setResult(msg);
+            server1.stop();
+            latch.countDown();
+        });
+        Intent service = new Intent(FCLPath.CONTEXT, ProcessService.class);
+        Bundle bundle = new Bundle();
+        bundle.putStringArray("command", command);
+        bundle.putInt("java", java);
+        service.putExtras(bundle);
+        FCLPath.CONTEXT.startService(service);
+        server.start();
+        latch.await();
+        exitCode = Integer.parseInt((String) server.getResult());
+        if (exitCode != 0) {
+            if (java == 8) {
+                runJVMProcess(command, 17);
+            } else if (java == 17) {
+                runJVMProcess(command, 11);
+            } else if (java == 11) {
+                runJVMProcess(command, 21);
+            } else {
+                throw new IOException("OptiFine patcher failed, command: " + new CommandBuilder().addAll(Arrays.asList(command)));
+            }
+        }
     }
 
     /**

@@ -1,8 +1,26 @@
+/*
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2021  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 package com.tungsten.fclcore.download;
 
 import static com.tungsten.fclcore.download.LibraryAnalyzer.LibraryType.BOOTSTRAP_LAUNCHER;
 import static com.tungsten.fclcore.download.LibraryAnalyzer.LibraryType.FORGE;
 import static com.tungsten.fclcore.download.LibraryAnalyzer.LibraryType.LITELOADER;
+import static com.tungsten.fclcore.download.LibraryAnalyzer.LibraryType.NEO_FORGE;
 import static com.tungsten.fclcore.download.LibraryAnalyzer.LibraryType.OPTIFINE;
 
 import com.tungsten.fclcore.game.Argument;
@@ -201,12 +219,12 @@ public class MaintainTask extends Task<Version> {
         LibraryAnalyzer libraryAnalyzer = LibraryAnalyzer.analyze(version);
         VersionLibraryBuilder builder = new VersionLibraryBuilder(version);
 
-        if (!libraryAnalyzer.has(FORGE)) return version;
+        if (!libraryAnalyzer.has(FORGE) && !libraryAnalyzer.has(NEO_FORGE)) return version;
 
         Optional<String> bslVersion = libraryAnalyzer.getVersion(BOOTSTRAP_LAUNCHER);
 
         if (bslVersion.isPresent()) {
-            if (VersionNumber.VERSION_COMPARATOR.compare(bslVersion.get(), "0.1.17") < 0) {
+            if (VersionNumber.compare(bslVersion.get(), "0.1.17") < 0) {
                 // The default ignoreList will be applied to all components of libraries in classpath,
                 // so if game directory located in some directory like /Users/asm, all libraries will be ignored,
                 // which is not expected. We fix this here.
@@ -286,7 +304,7 @@ public class MaintainTask extends Task<Version> {
     public static Version unique(Version version) {
         List<Library> libraries = new ArrayList<>();
 
-        SimpleMultimap<String, Integer> multimap = new SimpleMultimap<String, Integer>(HashMap::new, ArrayList::new);
+        SimpleMultimap<String, Integer, List<Integer>> multimap = new SimpleMultimap<>(HashMap::new, ArrayList::new);
 
         for (Library library : version.getLibraries()) {
             String id = library.getGroupId() + ":" + library.getArtifactId();

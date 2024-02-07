@@ -1,3 +1,20 @@
+/*
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 package com.tungsten.fcl.setting;
 
 import android.os.Build;
@@ -40,34 +57,36 @@ public class GameOption {
     }
 
     private void load(@NonNull String path) {
-        File optionFile = new File(path);
-        if (!optionFile.exists()) {
-            try {
-                optionFile.createNewFile();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
-
-        if (fileObserver == null) {
-            setupFileObserver();
-        }
-        parameterMap.clear();
-
-        try {
-            BufferedReader reader = new BufferedReader(new FileReader(optionFile));
-            String line;
-            while ((line = reader.readLine()) != null) {
-                int firstColonIndex = line.indexOf(':');
-                if (firstColonIndex < 0) {
-                    Logging.LOG.log(Level.INFO, "No colon on line \"" + line + "\", skipping");
-                    continue;
+        synchronized(this) {
+            File optionFile = new File(path);
+            if (!optionFile.exists()) {
+                try {
+                    optionFile.createNewFile();
+                } catch (IOException e) {
+                    e.printStackTrace();
                 }
-                parameterMap.put(line.substring(0, firstColonIndex), line.substring(firstColonIndex + 1));
             }
-            reader.close();
-        } catch (IOException e) {
-            Logging.LOG.log(Level.WARNING, "Could not load options.txt", e);
+
+            if (fileObserver == null) {
+                setupFileObserver();
+            }
+            parameterMap.clear();
+
+            try {
+                BufferedReader reader = new BufferedReader(new FileReader(optionFile));
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    int firstColonIndex = line.indexOf(':');
+                    if (firstColonIndex < 0) {
+                        Logging.LOG.log(Level.INFO, "No colon on line \"" + line + "\", skipping");
+                        continue;
+                    }
+                    parameterMap.put(line.substring(0, firstColonIndex), line.substring(firstColonIndex + 1));
+                }
+                reader.close();
+            } catch (IOException e) {
+                Logging.LOG.log(Level.WARNING, "Could not load options.txt", e);
+            }
         }
     }
 
@@ -100,19 +119,21 @@ public class GameOption {
     }
 
     public void save() {
-        StringBuilder result = new StringBuilder();
-        for(String key : parameterMap.keySet())
-            result.append(key)
-                    .append(':')
-                    .append(parameterMap.get(key))
-                    .append('\n');
+        synchronized(this) {
+            StringBuilder result = new StringBuilder();
+            for(String key : parameterMap.keySet())
+                result.append(key)
+                        .append(':')
+                        .append(parameterMap.get(key))
+                        .append('\n');
 
-        try {
-            fileObserver.stopWatching();
-            FileUtils.writeText(new File(optionPath), result.toString());
-            fileObserver.startWatching();
-        } catch (IOException e) {
-            Logging.LOG.log(Level.WARNING, "Could not save options.txt", e);
+            try {
+                fileObserver.stopWatching();
+                FileUtils.writeText(new File(optionPath), result.toString());
+                fileObserver.startWatching();
+            } catch (IOException e) {
+                Logging.LOG.log(Level.WARNING, "Could not save options.txt", e);
+            }
         }
     }
 
@@ -124,6 +145,12 @@ public class GameOption {
         int scale = Math.max(Math.min(width / 320, height / 240), 1);
         if (scale < guiScale || guiScale == 0) {
             guiScale = scale;
+        }
+
+        String lang = get("lang");
+        boolean isUnicode = lang != null && (lang.equals("zh_CN") || lang.equals("zh_cn"));
+        if (isUnicode && guiScale % 2 != 0 && guiScale != 1) {
+            --guiScale;
         }
 
         return guiScale;

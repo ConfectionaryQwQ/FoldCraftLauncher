@@ -4,15 +4,16 @@ import static android.content.Context.CLIPBOARD_SERVICE;
 import static android.content.Context.MODE_PRIVATE;
 import static android.os.Build.VERSION.SDK_INT;
 
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.graphics.Color;
 import android.graphics.Point;
 import android.graphics.Rect;
+import android.media.MediaMetadataRetriever;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -25,7 +26,9 @@ import com.tungsten.fcl.activity.WebActivity;
 import com.tungsten.fclcore.util.io.FileUtils;
 
 import java.io.File;
+import java.util.Objects;
 
+@SuppressLint("DiscouragedApi")
 public class AndroidUtils {
 
     public static void openLink(Context context, String link) {
@@ -61,7 +64,7 @@ public class AndroidUtils {
 
     public static String getLocalizedText(Context context, String key) {
         int resId = context.getResources().getIdentifier(key, "string", context.getPackageName());
-        if (resId != 0 && context.getString(resId) != null) {
+        if (resId != 0) {
             return context.getString(resId);
         } else {
             return key;
@@ -70,7 +73,7 @@ public class AndroidUtils {
 
     public static boolean hasStringId(Context context, String key) {
         int resId = context.getResources().getIdentifier(key, "string", context.getPackageName());
-        return resId != 0 && context.getString(resId) != null;
+        return resId != 0;
     }
 
 
@@ -94,15 +97,30 @@ public class AndroidUtils {
             try {
                 Rect notchRect;
                 if (SDK_INT >= Build.VERSION_CODES.S) {
-                    notchRect = wm.getCurrentWindowMetrics().getWindowInsets().getDisplayCutout().getBoundingRects().get(0);
+                    notchRect = Objects.requireNonNull(wm.getCurrentWindowMetrics().getWindowInsets().getDisplayCutout()).getBoundingRects().get(0);
                 } else {
-                    notchRect = context.getWindow().getDecorView().getRootWindowInsets().getDisplayCutout().getBoundingRects().get(0);
+                    notchRect = Objects.requireNonNull(context.getWindow().getDecorView().getRootWindowInsets().getDisplayCutout()).getBoundingRects().get(0);
                 }
                 return point.x - Math.min(notchRect.width(), notchRect.height());
             } catch (Exception e) {
                 return point.x;
             }
         }
+    }
+
+    @SuppressWarnings("resource")
+    public static String getMimeType(String filePath) {
+        MediaMetadataRetriever mmr = new MediaMetadataRetriever();
+        String mime = "*/*";
+        if (filePath != null) {
+            try {
+                mmr.setDataSource(filePath);
+                mime = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_MIMETYPE);
+            } catch (RuntimeException e) {
+                return mime;
+            }
+        }
+        return mime;
     }
 
 }

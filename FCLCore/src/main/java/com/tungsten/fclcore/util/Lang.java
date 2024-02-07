@@ -1,3 +1,20 @@
+/*
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 package com.tungsten.fclcore.util;
 
 import com.tungsten.fclcore.util.function.ExceptionalBiConsumer;
@@ -15,6 +32,18 @@ import java.util.stream.Stream;
 public final class Lang {
 
     private Lang() {
+    }
+
+    public static <T> T requireNonNullElse(T value, T defaultValue) {
+        return value != null ? value : defaultValue;
+    }
+
+    public static <T> T requireNonNullElseGet(T value, Supplier<? extends T> defaultValue) {
+        return value != null ? value : defaultValue.get();
+    }
+
+    public static <T, U> U requireNonNullElseGet(T value, Function<? super T, ? extends U> mapper, Supplier<? extends U> defaultValue) {
+        return value != null ? mapper.apply(value) : defaultValue.get();
     }
 
     /**
@@ -347,6 +376,13 @@ public final class Lang {
 
     public static <T> Iterable<T> toIterable(Iterator<T> iterator) {
         return () -> iterator;
+    }
+
+    public static <T, U> void forEachZipped(Iterable<T> i1, Iterable<U> i2, BiConsumer<T, U> action) {
+        Iterator<T> it1 = i1.iterator();
+        Iterator<U> it2 = i2.iterator();
+        while (it1.hasNext() && it2.hasNext())
+            action.accept(it1.next(), it2.next());
     }
 
     private static Timer timer;

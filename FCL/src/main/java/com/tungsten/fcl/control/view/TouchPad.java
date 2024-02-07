@@ -3,6 +3,7 @@ package com.tungsten.fcl.control.view;
 import android.content.Context;
 import android.os.Handler;
 import android.util.AttributeSet;
+import android.view.Choreographer;
 import android.view.MotionEvent;
 import android.view.View;
 
@@ -95,14 +96,20 @@ public class TouchPad extends View {
     public boolean onTouchEvent(MotionEvent event) {
         if (gameMenu.getCursorMode() == FCLBridge.CursorEnabled) {
             if (gameMenu.getMenuSetting().getMouseMoveMode() == MouseMoveMode.CLICK) {
+                gameMenu.getInput().setPointerId(POINTER_ID);
                 gameMenu.getInput().setPointer((int) event.getX(), (int) event.getY(), POINTER_ID);
+                gameMenu.getInput().setPointerId(null);
                 switch (event.getActionMasked()) {
                     case MotionEvent.ACTION_DOWN:
-                        gameMenu.getInput().sendKeyEvent(FCLInput.MOUSE_LEFT, true);
+                        Choreographer.getInstance().postFrameCallbackDelayed(frameTimeNanos -> {
+                            gameMenu.getInput().sendKeyEvent(FCLInput.MOUSE_LEFT, true);
+                        }, 33);
                         break;
                     case MotionEvent.ACTION_CANCEL:
                     case MotionEvent.ACTION_UP:
-                        gameMenu.getInput().sendKeyEvent(FCLInput.MOUSE_LEFT, false);
+                        Choreographer.getInstance().postFrameCallbackDelayed(frameTimeNanos -> {
+                            gameMenu.getInput().sendKeyEvent(FCLInput.MOUSE_LEFT, false);
+                        }, 33);
                         break;
                     default:
                         break;
@@ -164,8 +171,10 @@ public class TouchPad extends View {
                         downY = (int) event.getY();
                         break;
                     }
-                    int deltaX = (int) ((event.getX(pointerIndex) - downX) * gameMenu.getMenuSetting().getMouseSensitivity());
-                    int deltaY = (int) ((event.getY(pointerIndex) - downY) * gameMenu.getMenuSetting().getMouseSensitivity());
+                    int newDownX = (int) event.getX(pointerIndex);
+                    int newDownY = (int) event.getY(pointerIndex);
+                    int deltaX = (int) ((newDownX - downX) * gameMenu.getMenuSetting().getMouseSensitivity() / gameMenu.getBridge().getScaleFactor());
+                    int deltaY = (int) ((newDownY - downY) * gameMenu.getMenuSetting().getMouseSensitivity() / gameMenu.getBridge().getScaleFactor());
                     if (gameMenu.getMenuSetting().isEnableGyroscope()) {
                         gameMenu.setPointerX(initialX + deltaX);
                         gameMenu.setPointerY(initialY + deltaY);
@@ -176,8 +185,8 @@ public class TouchPad extends View {
                     if ((Math.abs(deltaX) > 1 || Math.abs(deltaY) > 1) && System.currentTimeMillis() - downTime < 400) {
                         handler.removeCallbacks(runnable);
                     }
-                    downX = (int) event.getX(pointerIndex);
-                    downY = (int) event.getY(pointerIndex);
+                    downX = newDownX;
+                    downY = newDownY;
                     break;
                 case MotionEvent.ACTION_CANCEL:
                 case MotionEvent.ACTION_UP:

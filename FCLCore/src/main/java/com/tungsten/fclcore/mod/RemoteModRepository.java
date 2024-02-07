@@ -1,3 +1,20 @@
+/*
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2021  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 package com.tungsten.fclcore.mod;
 
 import org.jetbrains.annotations.Nullable;
@@ -21,10 +38,10 @@ public interface RemoteModRepository {
     Type getType();
 
     enum SortType {
-        DATE_CREATED,
         POPULARITY,
-        LAST_UPDATED,
         NAME,
+        DATE_CREATED,
+        LAST_UPDATED,
         AUTHOR,
         TOTAL_DOWNLOADS
     }
@@ -34,7 +51,39 @@ public interface RemoteModRepository {
         DESC
     }
 
-    Stream<RemoteMod> search(String gameVersion, @Nullable Category category, int pageOffset, int pageSize, String searchFilter, SortType sortType, SortOrder sortOrder)
+    class SearchResult {
+        private final Stream<RemoteMod> sortedResults;
+
+        private final Stream<RemoteMod> unsortedResults;
+
+        private final int totalPages;
+
+        public SearchResult(Stream<RemoteMod> sortedResults, Stream<RemoteMod> unsortedResults, int totalPages) {
+            this.sortedResults = sortedResults;
+            this.unsortedResults = unsortedResults;
+            this.totalPages = totalPages;
+        }
+
+        public SearchResult(Stream<RemoteMod> sortedResults, int pages) {
+            this.sortedResults = sortedResults;
+            this.unsortedResults = sortedResults;
+            this.totalPages = pages;
+        }
+
+        public Stream<RemoteMod> getResults() {
+            return this.sortedResults;
+        }
+
+        public Stream<RemoteMod> getUnsortedResults() {
+            return this.unsortedResults;
+        }
+
+        public int getTotalPages() {
+            return this.totalPages;
+        }
+    }
+
+    SearchResult search(String gameVersion, @Nullable Category category, int pageOffset, int pageSize, String searchFilter, SortType sortType, SortOrder sortOrder)
             throws IOException;
 
     Optional<RemoteMod.Version> getRemoteVersionByLocalFile(LocalModFile localModFile, Path file) throws IOException;
@@ -71,7 +120,10 @@ public interface RemoteModRepository {
         }
     }
 
-    String[] DEFAULT_GAME_VERSIONS = new String[]{
+    String[] DEFAULT_GAME_VERSIONS = new String[] {
+            "",
+            "1.20.4", "1.20.3", "1.20.2", "1.20.1", "1.20",
+            "1.19.4", "1.19.3", "1.19.2", "1.19.1", "1.19",
             "1.18.2", "1.18.1", "1.18",
             "1.17.1", "1.17",
             "1.16.5", "1.16.4", "1.16.3", "1.16.2", "1.16.1", "1.16",

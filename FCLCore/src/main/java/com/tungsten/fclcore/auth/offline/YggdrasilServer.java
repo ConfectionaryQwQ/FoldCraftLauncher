@@ -1,3 +1,20 @@
+/*
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 package com.tungsten.fclcore.auth.offline;
 
 import static com.tungsten.fclcore.util.Lang.mapOf;
@@ -11,8 +28,9 @@ import com.tungsten.fclcore.util.Lang;
 import com.tungsten.fclcore.util.gson.JsonUtils;
 import com.tungsten.fclcore.util.gson.UUIDTypeAdapter;
 import com.tungsten.fclcore.util.io.HttpServer;
-import com.tungsten.fclcore.util.io.IOUtils;
+import com.tungsten.fclcore.util.png.fakefx.PNGFakeFXUtils;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.security.*;
 import java.util.*;
@@ -22,8 +40,6 @@ import java.util.stream.Stream;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
-import fi.iki.elonen.NanoHTTPD;
-
 public class YggdrasilServer extends HttpServer {
 
     private final Map<UUID, Character> charactersByUuid = new HashMap<>();
@@ -32,7 +48,7 @@ public class YggdrasilServer extends HttpServer {
     public YggdrasilServer(int port) {
         super(port);
 
-        addRoute(NanoHTTPD.Method.GET, Pattern.compile("^/$"), this::root);
+        addRoute(Method.GET, Pattern.compile("^/$"), this::root);
         addRoute(Method.GET, Pattern.compile("/status"), this::status);
         addRoute(Method.POST, Pattern.compile("/api/profiles/minecraft"), this::profiles);
         addRoute(Method.GET, Pattern.compile("/sessionserver/session/minecraft/hasJoined"), this::hasJoined);
@@ -66,8 +82,7 @@ public class YggdrasilServer extends HttpServer {
     }
 
     private Response profiles(Request request) throws IOException {
-        String body = IOUtils.readFullyAsString(request.getSession().getInputStream(), UTF_8);
-        List<String> names = JsonUtils.fromNonNullJson(body, new TypeToken<List<String>>() {
+        List<String> names = JsonUtils.fromNonNullJsonFully(request.getSession().getInputStream(), new TypeToken<List<String>>() {
         }.getType());
         return ok(names.stream().distinct()
                 .map(this::findCharacterByName)
@@ -115,7 +130,8 @@ public class YggdrasilServer extends HttpServer {
 
         if (Texture.hasTexture(hash)) {
             Texture texture = Texture.getTexture(hash);
-            Response response = newFixedLengthResponse(Response.Status.OK, "image/png", texture.getInputStream(), texture.getLength());
+            byte[] data = PNGFakeFXUtils.writeImageToArray(texture.getImage());
+            Response response = newFixedLengthResponse(Response.Status.OK, "image/png", new ByteArrayInputStream(data), data.length);
             response.addHeader("Etag", String.format("\"%s\"", hash));
             response.addHeader("Cache-Control", "max-age=2592000, public");
             return response;

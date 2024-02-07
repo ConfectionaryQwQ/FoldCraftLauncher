@@ -1,7 +1,22 @@
+/*
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 package com.tungsten.fclcore.download.forge;
 
-import static com.tungsten.fclcore.util.DigestUtils.digest;
-import static com.tungsten.fclcore.util.Hex.encodeHex;
 import static com.tungsten.fclcore.util.Logging.LOG;
 import static com.tungsten.fclcore.util.gson.JsonUtils.fromNonNullJson;
 
@@ -10,7 +25,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
 
-import com.tungsten.fclauncher.FCLPath;
+import com.tungsten.fclauncher.utils.FCLPath;
 import com.tungsten.fclcore.download.ArtifactMalformedException;
 import com.tungsten.fclcore.download.DefaultDependencyManager;
 import com.tungsten.fclcore.download.LibraryAnalyzer;
@@ -25,6 +40,7 @@ import com.tungsten.fclcore.game.Library;
 import com.tungsten.fclcore.game.Version;
 import com.tungsten.fclcore.task.FileDownloadTask;
 import com.tungsten.fclcore.task.Task;
+import com.tungsten.fclcore.util.DigestUtils;
 import com.tungsten.fclcore.util.SocketServer;
 import com.tungsten.fclcore.util.StringUtils;
 import com.tungsten.fclcore.util.function.ExceptionalFunction;
@@ -86,7 +102,7 @@ public class ForgeNewInstallTask extends Task<Version> {
                 if (Files.exists(artifact)) {
                     String code;
                     try (InputStream stream = Files.newInputStream(artifact)) {
-                        code = encodeHex(digest("SHA-1", stream));
+                        code = (DigestUtils.digestToString("SHA-1", stream));
                     }
 
                     if (!Objects.equals(code, value)) {
@@ -141,30 +157,7 @@ public class ForgeNewInstallTask extends Task<Version> {
 
             command.addAll(args);
 
-            LOG.info("Executing external processor " + processor.getJar().toString() + ", command line: " + new CommandBuilder().addAll(command).toString());
-            int exitCode;
-            boolean listen = true;
-            while (listen) {
-                if (((ActivityManager) FCLPath.CONTEXT.getSystemService(Context.ACTIVITY_SERVICE)).getRunningAppProcesses().size() == 1) {
-                    listen = false;
-                }
-            }
-            CountDownLatch latch = new CountDownLatch(1);
-            SocketServer server = new SocketServer("127.0.0.1", ProcessService.PROCESS_SERVICE_PORT, (server1, msg) -> {
-                server1.setResult(msg);
-                server1.stop();
-                latch.countDown();
-            });
-            Intent service = new Intent(FCLPath.CONTEXT, ProcessService.class);
-            Bundle bundle = new Bundle();
-            bundle.putStringArray("command", command.toArray(new String[0]));
-            service.putExtras(bundle);
-            FCLPath.CONTEXT.startService(service);
-            server.start();
-            latch.await();
-            exitCode = Integer.parseInt((String) server.getResult());
-            if (exitCode != 0)
-                throw new IOException("Game processor exited abnormally with code " + exitCode);
+            runJVMProcess(processor, command, 8);
 
             for (Map.Entry<String, String> entry : outputs.entrySet()) {
                 Path artifact = Paths.get(entry.getKey());
@@ -173,13 +166,50 @@ public class ForgeNewInstallTask extends Task<Version> {
 
                 String code;
                 try (InputStream stream = Files.newInputStream(artifact)) {
-                    code = encodeHex(digest("SHA-1", stream));
+                    code = DigestUtils.digestToString("SHA-1", stream);
                 }
 
                 if (!Objects.equals(code, entry.getValue())) {
                     Files.delete(artifact);
                     throw new ChecksumMismatchException("SHA-1", entry.getValue(), code);
                 }
+            }
+        }
+    }
+
+    private void runJVMProcess(ForgeNewInstallProfile.Processor processor, List<String> command, int java) throws Exception {
+        LOG.info("Executing external processor " + processor.getJar().toString() + ", command line: " + new CommandBuilder().addAll(command).toString());
+        int exitCode;
+        boolean listen = true;
+        while (listen) {
+            if (((ActivityManager) FCLPath.CONTEXT.getSystemService(Context.ACTIVITY_SERVICE)).getRunningAppProcesses().size() == 1) {
+                listen = false;
+            }
+        }
+        CountDownLatch latch = new CountDownLatch(1);
+        SocketServer server = new SocketServer("127.0.0.1", ProcessService.PROCESS_SERVICE_PORT, (server1, msg) -> {
+            server1.setResult(msg);
+            server1.stop();
+            latch.countDown();
+        });
+        Intent service = new Intent(FCLPath.CONTEXT, ProcessService.class);
+        Bundle bundle = new Bundle();
+        bundle.putStringArray("command", command.toArray(new String[0]));
+        bundle.putInt("java", java);
+        service.putExtras(bundle);
+        FCLPath.CONTEXT.startService(service);
+        server.start();
+        latch.await();
+        exitCode = Integer.parseInt((String) server.getResult());
+        if (exitCode != 0) {
+            if (java == 8) {
+                runJVMProcess(processor, command, 17);
+            } else if (java == 17) {
+                runJVMProcess(processor, command, 11);
+            } else if (java == 11) {
+                runJVMProcess(processor, command, 21);
+            } else {
+                throw new IOException("Game processor exited abnormally with code " + exitCode);
             }
         }
     }
@@ -199,7 +229,7 @@ public class ForgeNewInstallTask extends Task<Version> {
     private Path tempDir;
     private AtomicInteger processorDoneCount = new AtomicInteger(0);
 
-    ForgeNewInstallTask(DefaultDependencyManager dependencyManager, Version version, String selfVersion, Path installer) {
+    public ForgeNewInstallTask(DefaultDependencyManager dependencyManager, Version version, String selfVersion, Path installer) {
         this.dependencyManager = dependencyManager;
         this.gameRepository = dependencyManager.getGameRepository();
         this.version = version;

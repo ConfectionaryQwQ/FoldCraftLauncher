@@ -1,3 +1,20 @@
+/*
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 package com.tungsten.fclcore.auth;
 
 import com.tungsten.fclcore.auth.yggdrasil.Texture;
@@ -6,10 +23,13 @@ import com.tungsten.fclcore.fakefx.beans.InvalidationListener;
 import com.tungsten.fclcore.fakefx.beans.Observable;
 import com.tungsten.fclcore.fakefx.beans.binding.Bindings;
 import com.tungsten.fclcore.fakefx.beans.binding.ObjectBinding;
+import com.tungsten.fclcore.fakefx.beans.property.BooleanProperty;
+import com.tungsten.fclcore.fakefx.beans.property.SimpleBooleanProperty;
 import com.tungsten.fclcore.util.ToStringBuilder;
 import com.tungsten.fclcore.util.fakefx.ObservableHelper;
 
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -48,7 +68,23 @@ public abstract class Account implements Observable {
     public void clearCache() {
     }
 
-    private ObservableHelper helper = new ObservableHelper(this);
+    private final BooleanProperty portable = new SimpleBooleanProperty(false);
+
+    public BooleanProperty portableProperty() {
+        return portable;
+    }
+
+    public boolean isPortable() {
+        return portable.get();
+    }
+
+    public void setPortable(boolean value) {
+        this.portable.set(value);
+    }
+
+    public abstract String getIdentifier();
+
+    private final ObservableHelper helper = new ObservableHelper(this);
 
     @Override
     public void addListener(InvalidationListener listener) {
@@ -73,11 +109,28 @@ public abstract class Account implements Observable {
     }
 
     @Override
+    public int hashCode() {
+        return Objects.hash(portable);
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj)
+            return true;
+        if (!(obj instanceof Account))
+            return false;
+
+        Account another = (Account) obj;
+        return isPortable() == another.isPortable();
+    }
+
+    @Override
     public String toString() {
         return new ToStringBuilder(this)
                 .append("username", getUsername())
                 .append("character", getCharacter())
                 .append("uuid", getUUID())
+                .append("portable", isPortable())
                 .toString();
     }
 }

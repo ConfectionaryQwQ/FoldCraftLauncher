@@ -1,6 +1,31 @@
+/*
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 package com.tungsten.fclcore.mod;
 
+import com.google.gson.JsonParseException;
 import com.tungsten.fclcore.game.GameRepository;
+import com.tungsten.fclcore.mod.modinfo.FabricModMetadata;
+import com.tungsten.fclcore.mod.modinfo.ForgeNewModMetadata;
+import com.tungsten.fclcore.mod.modinfo.ForgeOldModMetadata;
+import com.tungsten.fclcore.mod.modinfo.LiteModMetadata;
+import com.tungsten.fclcore.mod.modinfo.PackMcMeta;
+import com.tungsten.fclcore.mod.modinfo.QuiltModMetadata;
+import com.tungsten.fclcore.util.Pair;
 import com.tungsten.fclcore.util.StringUtils;
 import com.tungsten.fclcore.util.io.CompressingUtils;
 import com.tungsten.fclcore.util.io.FileUtils;
@@ -8,12 +33,32 @@ import com.tungsten.fclcore.util.versioning.VersionNumber;
 
 import java.io.IOException;
 import java.nio.file.*;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Objects;
-import java.util.TreeSet;
+import java.util.*;
 
 public final class ModManager {
+    @FunctionalInterface
+    private interface ModMetadataReader {
+        LocalModFile fromFile(ModManager modManager, Path modFile, FileSystem fs) throws IOException, JsonParseException;
+    }
+
+    private static final Map<String, Pair<ModMetadataReader[], String>> READERS;
+
+    static {
+        TreeMap<String, Pair<ModMetadataReader[], String>> readers = new TreeMap<>();
+        readers.put("zip", Pair.pair(new ModMetadataReader[]{
+                ForgeOldModMetadata::fromFile,
+                ForgeNewModMetadata::fromFile,
+                FabricModMetadata::fromFile,
+                QuiltModMetadata::fromFile,
+                PackMcMeta::fromFile,
+        }, ""));
+        readers.put("jar", readers.get("zip"));
+        readers.put("litemod", Pair.pair(new ModMetadataReader[]{
+                LiteModMetadata::fromFile
+        }, "LiteLoader Mod"));
+        READERS = Collections.unmodifiableMap(readers);
+    }
+
     private final GameRepository repository;
     private final String id;
     private final TreeSet<LocalModFile> localModFiles = new TreeSet<>();
@@ -54,43 +99,28 @@ public final class ModManager {
 
     public LocalModFile getModInfo(Path modFile) {
         String fileName = StringUtils.removeSuffix(FileUtils.getName(modFile), DISABLED_EXTENSION, OLD_EXTENSION);
-        String description;
-        if (fileName.endsWith(".zip") || fileName.endsWith(".jar")) {
-            try {
-                return ForgeOldModMetadata.fromFile(this, modFile);
-            } catch (Exception ignore) {
-            }
-
-            try {
-                return ForgeNewModMetadata.fromFile(this, modFile);
-            } catch (Exception ignore) {
-            }
-
-            try {
-                return FabricModMetadata.fromFile(this, modFile);
-            } catch (Exception ignore) {
-            }
-
-            try {
-                return PackMcMeta.fromFile(this, modFile);
-            } catch (Exception ignore) {
-            }
-
-            description = "";
-        } else if (fileName.endsWith(".litemod")) {
-            try {
-                return LiteModMetadata.fromFile(this, modFile);
-            } catch (Exception ignore) {
-                description = "LiteLoader Mod";
-            }
-        } else {
+        String extension = fileName.substring(fileName.lastIndexOf(".") + 1);
+        Pair<ModMetadataReader[], String> currentReader = READERS.get(extension);
+        if (currentReader == null) {
             throw new IllegalArgumentException("File " + modFile + " is not a mod file.");
         }
+
+        try (FileSystem fs = CompressingUtils.createReadOnlyZipFileSystem(modFile)) {
+            for (ModMetadataReader reader : currentReader.getKey()) {
+                try {
+                    return reader.fromFile(this, modFile, fs);
+                } catch (Exception ignore) {
+                }
+            }
+        } catch (Exception ignored) {
+        }
+
         return new LocalModFile(this,
                 getLocalMod(FileUtils.getNameWithoutExtension(modFile), ModLoaderType.UNKNOWN),
                 modFile,
                 FileUtils.getNameWithoutExtension(modFile),
-                new LocalModFile.Description(description));
+                new LocalModFile.Description(currentReader.getValue())
+        );
     }
 
     public void refreshMods() throws IOException {
@@ -214,7 +244,11 @@ public final class ModManager {
 
     public Path disableMod(Path file) throws IOException {
         if (isOld(file)) return file; // no need to disable an old mod.
-        Path disabled = file.resolveSibling(StringUtils.addSuffix(FileUtils.getName(file), DISABLED_EXTENSION));
+
+        String fileName = FileUtils.getName(file);
+        if (fileName.endsWith(DISABLED_EXTENSION)) return file;
+
+        Path disabled = file.resolveSibling(fileName + DISABLED_EXTENSION);
         if (Files.exists(file))
             Files.move(file, disabled, StandardCopyOption.REPLACE_EXISTING);
         return disabled;
@@ -254,6 +288,11 @@ public final class ModManager {
 
             if (Files.exists(fs.getPath("fabric.mod.json"))) {
                 // Fabric mod
+                return true;
+            }
+
+            if (Files.exists(fs.getPath("quilt.mod.json"))) {
+                // Quilt mod
                 return true;
             }
 

@@ -1,13 +1,29 @@
+/*
+ * Hello Minecraft! Launcher
+ * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 package com.tungsten.fclcore.download;
 
 import com.google.gson.JsonParseException;
-import com.tungsten.fclauncher.FCLPath;
+import com.tungsten.fclauncher.utils.FCLPath;
 import com.tungsten.fclcore.download.game.LibraryDownloadTask;
 import com.tungsten.fclcore.game.Library;
 import com.tungsten.fclcore.game.LibraryDownloadInfo;
 import com.tungsten.fclcore.util.CacheRepository;
 import com.tungsten.fclcore.util.DigestUtils;
-import com.tungsten.fclcore.util.Hex;
 import com.tungsten.fclcore.util.Logging;
 import com.tungsten.fclcore.util.gson.JsonUtils;
 import com.tungsten.fclcore.util.gson.TolerableValidationException;
@@ -51,7 +67,7 @@ public class DefaultCacheRepository extends CacheRepository {
         lock.writeLock().lock();
         try {
             if (Files.isRegularFile(indexFile))
-                index = JsonUtils.fromNonNullJson(FileUtils.readText(indexFile.toFile()), Index.class);
+                index = JsonUtils.fromNonNullJson(FileUtils.readText(indexFile), Index.class);
             else
                 index = new Index();
         } catch (IOException | JsonParseException e) {
@@ -83,7 +99,7 @@ public class DefaultCacheRepository extends CacheRepository {
             LibraryDownloadInfo info = library.getDownload();
             String hash = info.getSha1();
             if (hash != null) {
-                String checksum = Hex.encodeHex(DigestUtils.digest("SHA-1", jar));
+                String checksum = DigestUtils.digestToString("SHA-1", jar);
                 if (hash.equalsIgnoreCase(checksum))
                     cacheLibrary(library, jar, false);
             } else if (library.getChecksums() != null && !library.getChecksums().isEmpty()) {
@@ -136,7 +152,7 @@ public class DefaultCacheRepository extends CacheRepository {
         if (Files.exists(jar)) {
             try {
                 if (hash != null) {
-                    String checksum = Hex.encodeHex(DigestUtils.digest("SHA-1", jar));
+                    String checksum = DigestUtils.digestToString("SHA-1", jar);
                     if (hash.equalsIgnoreCase(checksum))
                         return Optional.of(restore(jar, () -> cacheLibrary(library, jar, false)));
                 } else if (library.getChecksums() != null && !library.getChecksums().isEmpty()) {
@@ -165,10 +181,10 @@ public class DefaultCacheRepository extends CacheRepository {
     public Path cacheLibrary(Library library, Path path, boolean forge) throws IOException {
         String hash = library.getDownload().getSha1();
         if (hash == null)
-            hash = Hex.encodeHex(DigestUtils.digest(SHA1, path));
+            hash = DigestUtils.digestToString(SHA1, path);
 
         Path cache = getFile(SHA1, hash);
-        FileUtils.copyFile(path.toFile(), cache.toFile());
+        FileUtils.copyFile(path, cache);
 
         Lock writeLock = lock.writeLock();
         writeLock.lock();
@@ -186,7 +202,7 @@ public class DefaultCacheRepository extends CacheRepository {
     private void saveIndex() {
         if (indexFile == null || index == null) return;
         try {
-            FileUtils.writeText(indexFile.toFile(), JsonUtils.GSON.toJson(index));
+            FileUtils.writeText(indexFile, JsonUtils.GSON.toJson(index));
         } catch (IOException e) {
             Logging.LOG.log(Level.SEVERE, "Unable to save index.json", e);
         }
@@ -205,7 +221,7 @@ public class DefaultCacheRepository extends CacheRepository {
      *     // assets and versions will not be included in index.
      * }
      */
-    private class Index implements Validation {
+    private static final class Index implements Validation {
         private final Set<LibraryIndex> libraries;
 
         public Index() {
@@ -228,7 +244,7 @@ public class DefaultCacheRepository extends CacheRepository {
         }
     }
 
-    private class LibraryIndex implements Validation {
+    private static final class LibraryIndex implements Validation {
         private final String name;
         private final String hash;
         private final String type;
