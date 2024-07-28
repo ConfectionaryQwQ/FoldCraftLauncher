@@ -4,6 +4,7 @@ import static com.tungsten.fcl.util.FXUtils.onInvalidating;
 import static com.tungsten.fclcore.fakefx.collections.FXCollections.observableArrayList;
 
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonSyntaxException;
 import com.tungsten.fclauncher.utils.FCLPath;
 import com.tungsten.fclcore.fakefx.beans.Observable;
 import com.tungsten.fclcore.fakefx.beans.property.ReadOnlyListProperty;
@@ -28,16 +29,22 @@ public class Controllers {
 
     private static final ObservableList<Controller> controllers = observableArrayList(controller -> new Observable[] { controller });
     private static final ReadOnlyListWrapper<Controller> controllersWrapper = new ReadOnlyListWrapper<>(controllers);
+    public static Controller DEFAULT_CONTROLLER;
 
     public static void checkControllers() {
+        if (controllers.contains(null)) {
+            controllers.remove(null);
+        }
         if (controllers.isEmpty()) {
             try {
-                String str = IOUtils.readFullyAsString(Controllers.class.getResourceAsStream("/assets/controllers/Default.json"));
-                Controller controller = new GsonBuilder()
-                        .registerTypeAdapterFactory(new JavaFxPropertyTypeAdapterFactory(true, true))
-                        .setPrettyPrinting()
-                        .create().fromJson(str, Controller.class);
-                controller.saveToDisk();
+                if (DEFAULT_CONTROLLER == null) {
+                    String str = IOUtils.readFullyAsString(Controllers.class.getResourceAsStream("/assets/controllers/Default.json"));
+                    DEFAULT_CONTROLLER = new GsonBuilder()
+                            .registerTypeAdapterFactory(new JavaFxPropertyTypeAdapterFactory(true, true))
+                            .setPrettyPrinting()
+                            .create().fromJson(str, Controller.class);
+                }
+                DEFAULT_CONTROLLER.saveToDisk();
             } catch (IOException e) {
                 Logging.LOG.log(Level.SEVERE, "Failed to generate default controller!", e.getMessage());
             }
@@ -107,6 +114,9 @@ public class Controllers {
                     list.add(controller);
                 } catch (IOException e) {
                     Logging.LOG.log(Level.WARNING, "Can't read file: " + json.getAbsolutePath(), e.getMessage());
+                } catch (JsonSyntaxException e) {
+                    Logging.LOG.log(Level.WARNING, "File: " + json.getAbsolutePath(), e.getMessage() + " is broken!");
+                    json.renameTo(new File(FCLPath.CONTROLLER_DIR, json.getName() + ".bak"));
                 }
             }
         }
@@ -114,6 +124,10 @@ public class Controllers {
     }
 
     public static ObservableList<Controller> getControllers() {
+        if (controllers.contains(null)) {
+            controllers.remove(null);
+        }
+        if (controllers.isEmpty()) controllers.add(DEFAULT_CONTROLLER);
         return controllers;
     }
 

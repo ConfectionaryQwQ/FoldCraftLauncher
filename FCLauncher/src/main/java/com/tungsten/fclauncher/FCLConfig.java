@@ -13,7 +13,8 @@ public class FCLConfig implements Serializable {
         RENDERER_VIRGL("VirGLRenderer:libOSMesa_81.so:libEGL.so"),
         RENDERER_ANGLE("ANGLE:libtinywrapper.so:libEGL_angle.so"),
         RENDERER_VGPU("VGPU:libvgpu.so:libEGL.so"),
-        RENDERER_ZINK("Zink:libOSMesa_8.so:libEGL.so");
+        RENDERER_ZINK("Zink:libOSMesa_8.so:libEGL.so"),
+        RENDERER_FREEDRENO("Freedreno:libOSMesa_8.so:libEGL.so");
 
         private final String glInfo;
         private String glVersion;
@@ -55,6 +56,7 @@ public class FCLConfig implements Serializable {
     private final String workingDir;
     private final Renderer renderer;
     private final String[] args;
+    private boolean useVKDriverSystem = false;
 
     public FCLConfig(Context context, String logDir, String javaPath, String workingDir, Renderer renderer, String[] args) {
         this.context = context;
@@ -87,6 +89,14 @@ public class FCLConfig implements Serializable {
 
     public String[] getArgs() {
         return args;
+    }
+
+    public void setUseVKDriverSystem(boolean useVKDriverSystem) {
+        this.useVKDriverSystem = useVKDriverSystem;
+    }
+
+    public boolean isUseVKDriverSystem() {
+        return useVKDriverSystem;
     }
 
 }

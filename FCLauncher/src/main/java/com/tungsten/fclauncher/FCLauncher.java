@@ -5,10 +5,12 @@ import static com.tungsten.fclauncher.utils.Architecture.is64BitsDevice;
 
 import android.content.Context;
 import android.os.Build;
+import android.system.Os;
 import android.util.ArrayMap;
 
 import com.jaredrummler.android.device.DeviceName;
 import com.tungsten.fclauncher.bridge.FCLBridge;
+import com.tungsten.fclauncher.plugins.FFmpegPlugin;
 import com.tungsten.fclauncher.utils.Architecture;
 
 import java.io.BufferedReader;
@@ -22,15 +24,20 @@ import java.util.Map;
 
 public class FCLauncher {
 
+    private static void log(FCLBridge bridge, String log) {
+        bridge.getCallback().onLog(log + "\n");
+    }
+
     private static void printTaskTitle(FCLBridge bridge, String task) {
-        bridge.getCallback().onLog("==================== " + task + " ====================");
+        log(bridge, "==================== " + task + " ====================");
     }
 
     private static void logStartInfo(FCLBridge bridge, String task) {
         printTaskTitle(bridge, "Start " + task);
-        bridge.getCallback().onLog("Device: " + DeviceName.getDeviceName());
-        bridge.getCallback().onLog("Architecture: " + Architecture.archAsString(Architecture.getDeviceArchitecture()));
-        bridge.getCallback().onLog("CPU:" + Build.HARDWARE);
+        log(bridge, "Device: " + DeviceName.getDeviceName());
+        log(bridge, "Architecture: " + Architecture.archAsString(Architecture.getDeviceArchitecture()));
+        log(bridge, "CPU:" + Build.HARDWARE);
+        log(bridge, "Android SDK: " + Build.VERSION.SDK_INT);
     }
 
     private static Map<String, String> readJREReleaseProperties(String javaPath) throws IOException {
@@ -106,7 +113,8 @@ public class FCLauncher {
                 "/hw" +
                 split +
 
-                nativeDir;
+                nativeDir +
+                (FFmpegPlugin.isAvailable ? split + FFmpegPlugin.libraryPath : "");
     }
 
     private static String[] rebaseArgs(FCLConfig config) throws IOException {
@@ -125,6 +133,15 @@ public class FCLauncher {
         envMap.put("JAVA_HOME", config.getJavaPath());
         envMap.put("FCL_NATIVEDIR", config.getContext().getApplicationInfo().nativeLibraryDir);
         envMap.put("TMPDIR", config.getContext().getCacheDir().getAbsolutePath());
+        envMap.put("PATH", config.getJavaPath() + "/bin:" + Os.getenv("PATH"));
+        FFmpegPlugin.discover(config.getContext());
+        if (FFmpegPlugin.isAvailable) {
+            envMap.put("PATH", FFmpegPlugin.libraryPath + ":" + envMap.get("PATH"));
+            envMap.put("LD_LIBRARY_PATH", FFmpegPlugin.libraryPath);
+        }
+        if (config.isUseVKDriverSystem()) {
+            envMap.put("VULKAN_DRIVER_SYSTEM", "1");
+        }
     }
 
     private static void addRendererEnv(FCLConfig config, HashMap<String, String> envMap) {
@@ -155,6 +172,9 @@ public class FCLauncher {
                 envMap.put("OSMESA_NO_FLUSH_FRONTBUFFER", "1");
             } else if (renderer == FCLConfig.Renderer.RENDERER_ZINK) {
                 envMap.put("GALLIUM_DRIVER", "zink");
+            } else if (renderer == FCLConfig.Renderer.RENDERER_FREEDRENO) {
+                envMap.put("GALLIUM_DRIVER", "freedreno");
+                envMap.put("MESA_LOADER_DRIVER_OVERRIDE", "kgsl");
             }
         }
     }
@@ -167,7 +187,7 @@ public class FCLauncher {
         }
         printTaskTitle(bridge, "Env Map");
         for (String key : envMap.keySet()) {
-            bridge.getCallback().onLog("Env: " + key + "=" + envMap.get(key));
+            log(bridge, "Env: " + key + "=" + envMap.get(key));
             bridge.setenv(key, envMap.get(key));
         }
         printTaskTitle(bridge, "Env Map");
@@ -219,12 +239,30 @@ public class FCLauncher {
     private static void launch(FCLConfig config, FCLBridge bridge, String task) throws IOException {
         printTaskTitle(bridge, task + " Arguments");
         String[] args = rebaseArgs(config);
+        boolean javaArgs = true;
+        int mainClass = 0;
+        boolean isToken = false;
         for (String arg : args) {
-            bridge.getCallback().onLog(task + " argument: " + arg);
+            if (javaArgs)
+                javaArgs = !arg.equals("mio.Wrapper");
+            String title = task.equals("Minecraft") ? javaArgs ? "Java" : task : task;
+            String prefix = title + " argument: ";
+            if (task.equals("Minecraft") && !javaArgs && mainClass < 2) {
+                mainClass++;
+                prefix = "MainClass: ";
+            }
+            if (isToken) {
+                isToken = false;
+                log(bridge, prefix + "***");
+                continue;
+            }
+            if (arg.equals("--accessToken"))
+                isToken = true;
+            log(bridge, prefix + arg);
         }
         bridge.setupJLI();
         bridge.setLdLibraryPath(getLibraryPath(config.getContext(), config.getJavaPath()));
-        bridge.getCallback().onLog("Hook exit " + (bridge.setupExitTrap(bridge) == 0 ? "success" : "failed"));
+        log(bridge, "Hook exit " + (bridge.setupExitTrap(bridge) == 0 ? "success" : "failed"));
         int exitCode = bridge.jliLaunch(args);
         bridge.onExit(exitCode);
     }
@@ -248,7 +286,7 @@ public class FCLauncher {
                 setupGraphicAndSoundEngine(config, bridge);
 
                 // set working directory
-                bridge.getCallback().onLog("Working directory: " + config.getWorkingDir());
+                log(bridge, "Working directory: " + config.getWorkingDir());
                 bridge.chdir(config.getWorkingDir());
 
                 // launch game
@@ -284,7 +322,7 @@ public class FCLauncher {
                 setupGraphicAndSoundEngine(config, bridge);
 
                 // set working directory
-                bridge.getCallback().onLog("Working directory: " + config.getWorkingDir());
+                log(bridge, "Working directory: " + config.getWorkingDir());
                 bridge.chdir(config.getWorkingDir());
 
                 // launch jar executor
@@ -316,7 +354,7 @@ public class FCLauncher {
                 setUpJavaRuntime(config, bridge);
 
                 // set working directory
-                bridge.getCallback().onLog("Working directory: " + config.getWorkingDir());
+                log(bridge, "Working directory: " + config.getWorkingDir());
                 bridge.chdir(config.getWorkingDir());
 
                 // launch api installer

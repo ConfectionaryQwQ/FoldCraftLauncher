@@ -168,7 +168,7 @@ public class DefaultLauncher extends Launcher {
         }
 
         Set<String> classpath = repository.getClasspath(version);
-
+        classpath.add(FCLPath.MIO_LAUNCH_WRAPPER);
         File jar = new File(repository.getVersionRoot(version.getId()), version.getId() + ".jar");
 //        if (!jar.exists() || !jar.isFile())
 //            throw new IOException("Minecraft jar does not exist");
@@ -192,6 +192,13 @@ public class DefaultLauncher extends Launcher {
             res.add("-javaagent:" + javaAgent);
         }
 
+        if (javaVersion.getVersion() != JavaVersion.JAVA_VERSION_8) {
+            res.add("--add-exports");
+            String pkg = version.getMainClass().substring(0, version.getMainClass().lastIndexOf("."));
+            res.add(pkg + "/" + pkg + "=ALL-UNNAMED");
+        }
+
+        res.add("mio.Wrapper");
         res.add(version.getMainClass());
 
         res.addAll(Arguments.parseStringArguments(version.getMinecraftArguments().map(StringUtils::tokenize).orElseGet(ArrayList::new), configuration));
@@ -354,6 +361,7 @@ public class DefaultLauncher extends Launcher {
 
     public void extractLog4jConfigurationFile() throws IOException {
         File targetFile = getLog4jConfigurationFile();
+        if (targetFile.exists()) return;
         InputStream source;
         if (VersionNumber.compare(repository.getGameVersion(version).orElse("0.0"), "1.12") < 0) {
             source = DefaultLauncher.class.getResourceAsStream("/assets/game/log4j2-1.7.xml");
@@ -377,7 +385,7 @@ public class DefaultLauncher extends Launcher {
                 pair("${profile_name}", Optional.ofNullable(options.getProfileName()).orElse("Minecraft")),
                 pair("${version_type}", Optional.ofNullable(options.getVersionType()).orElse(version.getType().getId())),
                 pair("${game_directory}", repository.getRunDirectory(version.getId()).getAbsolutePath()),
-                pair("${user_type}", "mojang"),
+                pair("${user_type}", "msa"),
                 pair("${assets_index_name}", version.getAssetIndex().getId()),
                 pair("${user_properties}", authInfo.getUserProperties()),
                 pair("${resolution_width}", options.getWidth().toString()),
@@ -418,6 +426,7 @@ public class DefaultLauncher extends Launcher {
                 renderer,
                 finalArgs
         );
+        config.setUseVKDriverSystem(options.isVKDriverSystem());
         return FCLauncher.launchMinecraft(config);
     }
 }

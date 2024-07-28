@@ -75,6 +75,7 @@ public class VersionSettingPage extends FCLCommonPage implements ManageUI.Versio
 
     private FCLSwitch isolateWorkingDirSwitch;
     private FCLSwitch beGestureSwitch;
+    private FCLSwitch vulkanDriverSystemSwitch;
     private FCLSwitch noGameCheckSwitch;
     private FCLSwitch noJVMCheckSwitch;
 
@@ -119,6 +120,7 @@ public class VersionSettingPage extends FCLCommonPage implements ManageUI.Versio
         specialSettingSwitch.addCheckedChangeListener();
         isolateWorkingDirSwitch = findViewById(R.id.edit_game_dir);
         beGestureSwitch = findViewById(R.id.edit_controller_injector);
+        vulkanDriverSystemSwitch = findViewById(R.id.vulkan_driver_system);
         noGameCheckSwitch = findViewById(R.id.edit_not_check_game);
         noJVMCheckSwitch = findViewById(R.id.edit_not_check_java);
 
@@ -147,6 +149,7 @@ public class VersionSettingPage extends FCLCommonPage implements ManageUI.Versio
         rendererDataList.add(FCLConfig.Renderer.RENDERER_ANGLE);
         rendererDataList.add(FCLConfig.Renderer.RENDERER_VGPU);
         rendererDataList.add(FCLConfig.Renderer.RENDERER_ZINK);
+        rendererDataList.add(FCLConfig.Renderer.RENDERER_FREEDRENO);
         rendererSpinner.setDataList(rendererDataList);
 
         // add spinner text
@@ -166,6 +169,7 @@ public class VersionSettingPage extends FCLCommonPage implements ManageUI.Versio
         rendererList.add(getContext().getString(R.string.settings_fcl_renderer_angle));
         rendererList.add(getContext().getString(R.string.settings_fcl_renderer_vgpu));
         rendererList.add(getContext().getString(R.string.settings_fcl_renderer_zink));
+        rendererList.add(getContext().getString(R.string.settings_fcl_renderer_freedreno));
         ArrayAdapter<String> rendererAdapter = new ArrayAdapter<>(getContext(), R.layout.item_spinner_auto_tint, rendererList);
         rendererAdapter.setDropDownViewResource(R.layout.item_spinner_dropdown);
         rendererSpinner.setAdapter(rendererAdapter);
@@ -284,6 +288,7 @@ public class VersionSettingPage extends FCLCommonPage implements ManageUI.Versio
             FXUtils.unbindBoolean(noGameCheckSwitch, lastVersionSetting.notCheckGameProperty());
             FXUtils.unbindBoolean(noJVMCheckSwitch, lastVersionSetting.notCheckJVMProperty());
             FXUtils.unbindBoolean(beGestureSwitch, lastVersionSetting.beGestureProperty());
+            FXUtils.unbindBoolean(vulkanDriverSystemSwitch, lastVersionSetting.VKDriverSystemProperty());
             FXUtils.unbindSelection(javaSpinner, lastVersionSetting.javaProperty());
             FXUtils.unbindSelection(rendererSpinner, lastVersionSetting.rendererProperty());
             scaleFactorSeekbar.percentProgressProperty().unbindBidirectional(lastVersionSetting.scaleFactorProperty());
@@ -305,6 +310,7 @@ public class VersionSettingPage extends FCLCommonPage implements ManageUI.Versio
         FXUtils.bindBoolean(noGameCheckSwitch, versionSetting.notCheckGameProperty());
         FXUtils.bindBoolean(noJVMCheckSwitch, versionSetting.notCheckJVMProperty());
         FXUtils.bindBoolean(beGestureSwitch, versionSetting.beGestureProperty());
+        FXUtils.bindBoolean(vulkanDriverSystemSwitch, versionSetting.VKDriverSystemProperty());
         FXUtils.bindSelection(javaSpinner, versionSetting.javaProperty());
         FXUtils.bindSelection(rendererSpinner, versionSetting.rendererProperty());
         scaleFactorSeekbar.percentProgressProperty().bindBidirectional(versionSetting.scaleFactorProperty());

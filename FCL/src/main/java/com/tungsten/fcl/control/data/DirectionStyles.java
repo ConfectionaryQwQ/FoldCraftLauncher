@@ -5,6 +5,7 @@ import static com.tungsten.fclcore.fakefx.collections.FXCollections.observableAr
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonSyntaxException;
 import com.google.gson.reflect.TypeToken;
 import com.tungsten.fclauncher.utils.FCLPath;
 import com.tungsten.fclcore.fakefx.beans.Observable;
@@ -17,6 +18,7 @@ import com.tungsten.fclcore.util.io.FileUtils;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Objects;
 import java.util.logging.Level;
 
 public class DirectionStyles {
@@ -28,6 +30,8 @@ public class DirectionStyles {
     private static final ReadOnlyListWrapper<ControlDirectionStyle> stylesWrapper = new ReadOnlyListWrapper<>(styles);
 
     public static void checkStyles() {
+        if (!initialized)
+            return;
         if (styles.isEmpty()) {
             styles.add(ControlDirectionStyle.DEFAULT_DIRECTION_STYLE);
             saveStyles();
@@ -59,23 +63,31 @@ public class DirectionStyles {
 
     public static void init() {
         if (initialized)
-            throw new IllegalStateException("Already initialized");
+            return;
 
-        styles.addAll(getStylesFromDisk());
+        getStylesFromDisk().forEach(DirectionStyles::addStyle);
         checkStyles();
 
         initialized = true;
     }
 
     private static ArrayList<ControlDirectionStyle> getStylesFromDisk() {
+        ArrayList<ControlDirectionStyle> list = new ArrayList<>();
         try {
             String json = FileUtils.readText(new File(FCLPath.CONTROLLER_DIR + "/styles/direction_styles.json"));
             Gson gson = new GsonBuilder().setPrettyPrinting().create();
-            return gson.fromJson(json, new TypeToken<ArrayList<ControlDirectionStyle>>(){}.getType());
+            ArrayList<ControlDirectionStyle> styles =  gson.fromJson(json, new TypeToken<ArrayList<ControlDirectionStyle>>(){}.getType());
+            if (Objects.isNull(styles)) {
+                new File(FCLPath.CONTROLLER_DIR + "/styles/button_styles.json").delete();
+            } else {
+                list.addAll(styles);
+            }
         } catch (IOException e) {
             Logging.LOG.log(Level.SEVERE, "Failed to get direction styles", e);
-            return new ArrayList<>();
+        } catch (JsonSyntaxException e) {
+            new File(FCLPath.CONTROLLER_DIR + "/styles/direction_styles.json").delete();
         }
+        return list;
     }
 
     public static ObservableList<ControlDirectionStyle> getStyles() {
@@ -98,7 +110,12 @@ public class DirectionStyles {
 
     public static void addStyle(ControlDirectionStyle style) {
         if (!initialized) return;
-        styles.add(style);
+        boolean add = true;
+        for (ControlDirectionStyle directionStyle : getStyles())
+            if (directionStyle.getName().equals(style.getName()))
+                add = false;
+        if (add)
+            styles.add(style);
     }
 
     public static void removeStyles(ControlDirectionStyle style) {
