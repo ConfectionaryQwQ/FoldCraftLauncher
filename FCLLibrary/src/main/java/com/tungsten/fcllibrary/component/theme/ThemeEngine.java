@@ -1,5 +1,7 @@
 package com.tungsten.fcllibrary.component.theme;
 
+import android.app.WallpaperColors;
+import android.app.WallpaperManager;
 import android.content.Context;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
@@ -12,6 +14,7 @@ import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 
+import com.mio.util.ImageUtil;
 import com.tungsten.fclauncher.utils.FCLPath;
 import com.tungsten.fclcore.util.io.FileUtils;
 import com.tungsten.fcllibrary.R;
@@ -44,6 +47,9 @@ public class ThemeEngine {
         if (!initialized) {
             handler = new Handler();
             theme = Theme.getTheme(context);
+            if (!theme.isModified()) {
+                theme.setColor(getWallpaperColor(context));
+            }
             runnables = new HashMap<>();
             initialized = true;
         }
@@ -72,6 +78,15 @@ public class ThemeEngine {
 
     public void applyColor(int color) {
         theme.setColor(color);
+        for (View view : runnables.keySet()) {
+            if (view != null && runnables.get(view) != null) {
+                handler.post(runnables.get(view));
+            }
+        }
+    }
+
+    public void applyColor2(int color) {
+        theme.setColor2(color);
         for (View view : runnables.keySet()) {
             if (view != null && runnables.get(view) != null) {
                 handler.post(runnables.get(view));
@@ -113,26 +128,24 @@ public class ThemeEngine {
         }
         Bitmap ltBitmap;
         Bitmap dkBitmap;
-        try {
-            ltBitmap = !new File(FCLPath.LT_BACKGROUND_PATH).exists() ? ConvertUtils.getBitmapFromRes(context, R.drawable.background_light) : BitmapFactory.decodeFile(FCLPath.LT_BACKGROUND_PATH);
-            dkBitmap = !new File(FCLPath.DK_BACKGROUND_PATH).exists() ? ConvertUtils.getBitmapFromRes(context, R.drawable.background_dark) : BitmapFactory.decodeFile(FCLPath.DK_BACKGROUND_PATH);
-        } catch (RuntimeException e) {
-            new File(FCLPath.LT_BACKGROUND_PATH).delete();
-            new File(FCLPath.DK_BACKGROUND_PATH).delete();
-            ltBitmap = ConvertUtils.getBitmapFromRes(context, R.drawable.background_light);
-            dkBitmap = ConvertUtils.getBitmapFromRes(context, R.drawable.background_dark);
-        }
-        BitmapDrawable lt = new BitmapDrawable(ltBitmap);
-        BitmapDrawable dk = new BitmapDrawable(dkBitmap);
+        ltBitmap = ImageUtil.load(FCLPath.LT_BACKGROUND_PATH).orElse(ConvertUtils.getBitmapFromRes(context, R.drawable.background_light));
+        dkBitmap = ImageUtil.load(FCLPath.DK_BACKGROUND_PATH).orElse(ConvertUtils.getBitmapFromRes(context, R.drawable.background_dark));
+        BitmapDrawable lt = new BitmapDrawable(context.getResources(), ltBitmap);
+        BitmapDrawable dk = new BitmapDrawable(context.getResources(), dkBitmap);
         theme.setBackgroundLt(lt);
         theme.setBackgroundDk(dk);
         boolean isNightMode = (context.getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
         view.setBackground(isNightMode ? dk : lt);
     }
 
-    public void applyAndSave(Context context, int color) {
+    public void applyAndSave(Context context, int color, boolean modified) {
         applyColor(color);
-        Theme.saveTheme(context, theme);
+        Theme.saveTheme(context, theme, modified);
+    }
+
+    public void applyAndSave2(Context context, int color, boolean modified) {
+        applyColor2(color);
+        Theme.saveTheme(context, theme, modified);
     }
 
     public void applyAndSave(Context context, Window window, boolean fullscreen) {
@@ -149,6 +162,17 @@ public class ThemeEngine {
         applyColor(theme.getColor());
         applyFullscreen(window, theme.isFullscreen());
         Theme.saveTheme(context, theme);
+    }
+
+    public static int getWallpaperColor(Context context) {
+        int color = Color.parseColor("#7797CF");
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            WallpaperColors colors = WallpaperManager.getInstance(context).getWallpaperColors(WallpaperManager.FLAG_SYSTEM);
+            if (colors != null) {
+                color = colors.getPrimaryColor().toArgb();
+            }
+        }
+        return color;
     }
 
 }

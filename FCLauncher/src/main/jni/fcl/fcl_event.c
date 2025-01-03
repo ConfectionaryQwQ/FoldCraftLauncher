@@ -5,6 +5,22 @@
 #include <fcl_internal.h>
 #include <android/log.h>
 
+FCLinjectorfun injectorCallback;
+
+void fclSetInjectorCallback(FCLinjectorfun callback) {
+    injectorCallback = callback;
+}
+
+void fclSetHitResultType(int type) {
+    PrepareFCLBridgeJNI();
+    CallFCLBridgeJNIFunc( , Void, setHitResultType, "(I)V", type);
+}
+
+JNIEXPORT void JNICALL Java_com_tungsten_fclauncher_bridge_FCLBridge_refreshHitResultType(JNIEnv *env, jobject thiz) {
+    if (injectorCallback)
+        injectorCallback();
+}
+
 void EventQueue_init(EventQueue* queue) {
     queue->count = 0;
     queue->head = NULL;
@@ -57,20 +73,6 @@ void EventQueue_clear(EventQueue* queue) {
     }
 }
 
-FCLinjectorfun injectorCallback;
-
-void fclSetInjectorCallback(FCLinjectorfun callback) {
-    injectorCallback = callback;
-}
-
-void fclSetHitResultType(int type) {
-    if (!fcl->has_event_pipe) {
-        return;
-    }
-    PrepareFCLBridgeJNI();
-    CallFCLBridgeJNIFunc( , Void, setHitResultType, "(I)V", type);
-}
-
 void fclSetCursorMode(int mode) {
     if (!fcl->has_event_pipe) {
         return;
@@ -116,11 +118,6 @@ int fclPollEvent(FCLEvent* event) {
         return 0;
     }
     return ret;
-}
-
-JNIEXPORT void JNICALL Java_com_tungsten_fclauncher_bridge_FCLBridge_refreshHitResultType(JNIEnv *env, jobject thiz) {
-    if (injectorCallback)
-        injectorCallback();
 }
 
 JNIEXPORT void JNICALL Java_com_tungsten_fclauncher_bridge_FCLBridge_pushEvent(JNIEnv* env, jclass clazz, jlong time, jint type, jint p1, jint p2) {

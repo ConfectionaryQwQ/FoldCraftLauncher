@@ -18,12 +18,15 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.constraintlayout.widget.ConstraintLayout;
 import androidx.core.app.ActivityCompat;
+import androidx.core.app.ActivityOptionsCompat;
 import androidx.core.content.ContextCompat;
 
 import com.tungsten.fcl.R;
 import com.tungsten.fcl.fragment.EulaFragment;
 import com.tungsten.fcl.fragment.RuntimeFragment;
 import com.tungsten.fcl.util.RequestCodes;
+import com.tungsten.fclauncher.plugins.DriverPlugin;
+import com.tungsten.fclauncher.plugins.RendererPlugin;
 import com.tungsten.fclauncher.utils.FCLPath;
 import com.tungsten.fclcore.util.Logging;
 import com.tungsten.fclcore.util.io.FileUtils;
@@ -40,9 +43,6 @@ import java.nio.file.Paths;
 public class SplashActivity extends FCLActivity {
 
     public ConstraintLayout background;
-
-    private EulaFragment eulaFragment;
-    private RuntimeFragment runtimeFragment;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -103,21 +103,15 @@ public class SplashActivity extends FCLActivity {
         FCLPath.loadPaths(this);
         transFile();
         Logging.start(Paths.get(FCLPath.LOG_DIR));
-        initFragments();
         start();
-    }
-
-    private void initFragments() {
-        eulaFragment = new EulaFragment();
-        runtimeFragment = new RuntimeFragment();
     }
 
     public void start() {
         SharedPreferences sharedPreferences = getSharedPreferences("launcher", MODE_PRIVATE);
         if (sharedPreferences.getBoolean("isFirstLaunch", true)) {
-            getSupportFragmentManager().beginTransaction().setCustomAnimations(R.anim.frag_start_anim, R.anim.frag_stop_anim).replace(R.id.fragment, eulaFragment).commit();
+            getSupportFragmentManager().beginTransaction().setCustomAnimations(R.anim.frag_start_anim, R.anim.frag_stop_anim).replace(R.id.fragment, EulaFragment.class, null).commit();
         } else {
-            getSupportFragmentManager().beginTransaction().setCustomAnimations(R.anim.frag_start_anim, R.anim.frag_stop_anim).replace(R.id.fragment, runtimeFragment).commit();
+            getSupportFragmentManager().beginTransaction().setCustomAnimations(R.anim.frag_start_anim, R.anim.frag_stop_anim).replace(R.id.fragment, RuntimeFragment.class, null).commit();
         }
     }
 
@@ -133,9 +127,11 @@ public class SplashActivity extends FCLActivity {
     }
 
     public void enterLauncher() {
-        finish();
+        RendererPlugin.init(this);
+        DriverPlugin.init(this);
         Intent intent = new Intent(this, MainActivity.class);
         startActivity(intent);
+        finish();
     }
 
     @Override

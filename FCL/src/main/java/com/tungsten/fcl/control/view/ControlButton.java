@@ -134,7 +134,9 @@ public class ControlButton extends AppCompatButton implements CustomView {
         });
         alphaListener = invalidate -> Schedulers.androidUIThread().execute(() -> {
             setAlpha(menu.isHideAllViews() ? 0 : 1);
-            ((DrawerLayout) gameMenu.getLayout()).setDrawerLockMode(menu.isHideAllViews() ? 0 : 1);
+            if (!menu.getMenuSetting().isHideMenuView()) {
+                ((DrawerLayout) gameMenu.getLayout()).setDrawerLockMode(menu.isHideAllViews() ? DrawerLayout.LOCK_MODE_UNLOCKED : DrawerLayout.LOCK_MODE_LOCKED_CLOSED);
+            }
         });
 
         post(() -> {
@@ -180,7 +182,7 @@ public class ControlButton extends AppCompatButton implements CustomView {
             width = data.getBaseInfo().getPercentageWidth().getReference() == BaseInfoData.PercentageSize.Reference.SCREEN_WIDTH ?
                     (int) (screenWidth * (data.getBaseInfo().getPercentageWidth().getSize() / 1000f)) :
                     (int) (screenHeight * (data.getBaseInfo().getPercentageWidth().getSize() / 1000f));
-            height = data.getBaseInfo().getPercentageWidth().getReference() == BaseInfoData.PercentageSize.Reference.SCREEN_WIDTH ?
+            height = data.getBaseInfo().getPercentageHeight().getReference() == BaseInfoData.PercentageSize.Reference.SCREEN_WIDTH ?
                     (int) (screenWidth * (data.getBaseInfo().getPercentageHeight().getSize() / 1000f)) :
                     (int) (screenHeight * (data.getBaseInfo().getPercentageHeight().getSize() / 1000f));
         }

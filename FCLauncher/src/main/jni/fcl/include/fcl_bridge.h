@@ -14,10 +14,10 @@ ANativeWindow* fclGetNativeWindow(void);
 int fclWaitForEvent(int timeout);
 int fclPollEvent(FCLEvent* event);
 int fclGetEventFd(void);
-void fclLog(const char *buffer);
+void fclSetCursorMode(int mode);
+
 void fclSetInjectorCallback(FCLinjectorfun callback);
 void fclSetHitResultType(int type);
-void fclSetCursorMode(int mode);
 void fclSetPrimaryClipString(const char* string);
 const char* fclGetPrimaryClipString(void);
 

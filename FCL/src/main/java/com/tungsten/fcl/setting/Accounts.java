@@ -243,7 +243,7 @@ public final class Accounts {
      */
     static void init() {
         if (initialized)
-            throw new IllegalStateException("Already initialized");
+            return;
 
         loadGlobalAccountStorages();
 
@@ -471,6 +471,8 @@ public final class Accounts {
             } else {
                 return context.getString(R.string.account_methods_microsoft_error_unknown);
             }
+        } else if (exception instanceof MicrosoftService.XBox400Exception) {
+            return context.getString(R.string.account_methods_microsoft_error_wrong_verify_method);
         } else if (exception instanceof MicrosoftService.NoMinecraftJavaEditionProfileException) {
             return context.getString(R.string.account_methods_microsoft_error_no_character);
         } else if (exception instanceof MicrosoftService.NoXuiException) {

@@ -54,6 +54,7 @@ import java.util.logging.Level;
 import java.util.stream.Collectors;
 
 public class DefaultLauncher extends Launcher {
+    private String jnaVersion;
 
     public DefaultLauncher(Context context, GameRepository repository, Version version, AuthInfo authInfo, LaunchOptions options) {
         super(context, repository, version, authInfo, options);
@@ -144,14 +145,27 @@ public class DefaultLauncher extends Launcher {
         res.addDefault("-Dos.name=", "Linux");
         res.addDefault("-Dos.version=Android-", Build.VERSION.RELEASE);
         res.addDefault("-Dorg.lwjgl.opengl.libname=", "${gl_lib_name}");
+        res.addDefault("-Dorg.lwjgl.freetype.libname=", context.getApplicationInfo().nativeLibraryDir + "/libfreetype.so");
         res.addDefault("-Dfml.earlyprogresswindow=", "false");
-        res.addDefault("-Dwindow.width=", options.getWidth() + "");
-        res.addDefault("-Dwindow.height=", options.getHeight() + "");
+        if (FCLBridge.BACKEND_IS_BOAT) {
+            res.addDefault("-Dwindow.width=", options.getWidth() + "");
+            res.addDefault("-Dwindow.height=", options.getHeight() + "");
+        } else {
+            res.addDefault("-Dglfwstub.windowWidth=", options.getWidth() + "");
+            res.addDefault("-Dglfwstub.windowHeight=", options.getHeight() + "");
+        }
+        res.addDefault("-Dglfwstub.initEgl=", "false");
+        res.addDefault("-Dloader.disable_forked_guis=", "true");
         res.addDefault("-Duser.home=", options.getGameDir().getAbsolutePath());
         res.addDefault("-Duser.language=", System.getProperty("user.language"));
         res.addDefault("-Duser.timezone=", TimeZone.getDefault().getID());
-        res.addDefault("-Djna.boot.library.path=", context.getApplicationInfo().nativeLibraryDir);
         res.addDefault("-Dorg.lwjgl.vulkan.libname=", "libvulkan.so");
+        res.addDefault("-Dsodium.checks.issue2561=", "false");
+        File libJna = new File(FCLPath.RUNTIME_DIR, "jna");
+        if (jnaVersion != null && !jnaVersion.isEmpty()) {
+            libJna = new File(libJna, jnaVersion);
+        }
+        res.addDefault("-Djna.boot.library.path=", libJna.exists() ? libJna.getAbsolutePath() : context.getApplicationInfo().nativeLibraryDir);
 
         if (getInjectorArg() != null && options.isBeGesture()) {
             res.addDefault("-Dfcl.injector=", getInjectorArg());
@@ -163,9 +177,10 @@ public class DefaultLauncher extends Launcher {
         }
 
         // Fix 1.16.x multiplayer
-        if (repository.getGameVersion(version).isPresent() && repository.getGameVersion(version).get().startsWith("1.16")) {
-            res.add("-javaagent:" + FCLPath.MULTIPLAYER_FIX_PATH);
-        }
+//        if (repository.getGameVersion(version).isPresent() && repository.getGameVersion(version).get().startsWith("1.16")) {
+//
+//        }
+        res.add("-javaagent:" + FCLPath.LIB_FIXER_PATH);
 
         Set<String> classpath = repository.getClasspath(version);
         classpath.add(FCLPath.MIO_LAUNCH_WRAPPER);
@@ -183,7 +198,13 @@ public class DefaultLauncher extends Launcher {
 
         configuration.put("${natives_directory}", "${natives_directory}");
         List<String> jvmArgs = Arguments.parseArguments(version.getArguments().map(Arguments::getJvm).orElseGet(this::getDefaultJVMArguments), configuration);
-        res.addAll(jvmArgs.stream().filter(arg -> !arg.contains("-Djna.tmpdir=") && !arg.contains("-Dorg.lwjgl.system.SharedLibraryExtractPath=")).collect(Collectors.toList()));
+        res.addAll(jvmArgs.stream().map(arg -> {
+            String result = arg;
+            if (arg.contains("-Dio.netty.native.workdir") || arg.contains("-Djna.tmpdir") || arg.contains("-Dorg.lwjgl.system.SharedLibraryExtractPath")) {
+                result = arg.replace("${natives_directory}", FCLPath.CACHE_DIR);
+            }
+            return result;
+        }).collect(Collectors.toList()));
         Arguments argumentsFromAuthInfo = authInfo.getLaunchArguments(options);
         if (argumentsFromAuthInfo != null && argumentsFromAuthInfo.getJvm() != null && !argumentsFromAuthInfo.getJvm().isEmpty())
             res.addAll(Arguments.parseArguments(argumentsFromAuthInfo.getJvm(), configuration));
@@ -427,6 +448,11 @@ public class DefaultLauncher extends Launcher {
                 finalArgs
         );
         config.setUseVKDriverSystem(options.isVKDriverSystem());
+        config.setPojavBigCore(options.isPojavBigCore());
         return FCLauncher.launchMinecraft(config);
+    }
+
+    public void setJnaVersion(String jnaVersion) {
+        this.jnaVersion = jnaVersion;
     }
 }

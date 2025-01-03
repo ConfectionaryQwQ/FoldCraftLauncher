@@ -48,7 +48,7 @@
 
 #define GLFW_INCLUDE_NONE
 #include <glfw3.h>
-#include "gl/gl.h"
+#include "gl.h"
 
 #define _GLFW_INSERT_FIRST      0
 #define _GLFW_INSERT_LAST       1

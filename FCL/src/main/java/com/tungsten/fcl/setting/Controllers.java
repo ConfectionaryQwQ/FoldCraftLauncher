@@ -4,12 +4,13 @@ import static com.tungsten.fcl.util.FXUtils.onInvalidating;
 import static com.tungsten.fclcore.fakefx.collections.FXCollections.observableArrayList;
 
 import com.google.gson.GsonBuilder;
-import com.google.gson.JsonSyntaxException;
+import com.google.gson.JsonParseException;
 import com.tungsten.fclauncher.utils.FCLPath;
 import com.tungsten.fclcore.fakefx.beans.Observable;
 import com.tungsten.fclcore.fakefx.beans.property.ReadOnlyListProperty;
 import com.tungsten.fclcore.fakefx.beans.property.ReadOnlyListWrapper;
 import com.tungsten.fclcore.fakefx.collections.ObservableList;
+import com.tungsten.fclcore.task.Schedulers;
 import com.tungsten.fclcore.util.Logging;
 import com.tungsten.fclcore.util.gson.fakefx.factories.JavaFxPropertyTypeAdapterFactory;
 import com.tungsten.fclcore.util.io.FileUtils;
@@ -27,9 +28,11 @@ public class Controllers {
     private Controllers() {
     }
 
-    private static final ObservableList<Controller> controllers = observableArrayList(controller -> new Observable[] { controller });
+    private static final ObservableList<Controller> controllers = observableArrayList(controller -> new Observable[]{controller});
     private static final ReadOnlyListWrapper<Controller> controllersWrapper = new ReadOnlyListWrapper<>(controllers);
     public static Controller DEFAULT_CONTROLLER;
+
+    private static final List<Runnable> CALLBACKS = new ArrayList<>();
 
     public static void checkControllers() {
         if (controllers.contains(null)) {
@@ -38,7 +41,7 @@ public class Controllers {
         if (controllers.isEmpty()) {
             try {
                 if (DEFAULT_CONTROLLER == null) {
-                    String str = IOUtils.readFullyAsString(Controllers.class.getResourceAsStream("/assets/controllers/Default.json"));
+                    String str = IOUtils.readFullyAsString(Controllers.class.getResourceAsStream("/assets/controllers/00000000.json"));
                     DEFAULT_CONTROLLER = new GsonBuilder()
                             .registerTypeAdapterFactory(new JavaFxPropertyTypeAdapterFactory(true, true))
                             .setPrettyPrinting()
@@ -71,17 +74,13 @@ public class Controllers {
         if (files != null) {
             ArrayList<String> fileNames = (ArrayList<String>) controllers.stream().map(Controller::getFileName).collect(Collectors.toList());
             for (File file : files) {
-                if (file.isDirectory() || !fileNames.contains(file.getName())) {
+                if (((file.isDirectory() && !file.getName().equals("styles") && !file.getName().equals("input")) || !fileNames.contains(file.getName())) && !file.getName().endsWith(".bak")) {
                     file.delete();
                 }
             }
         }
         for (Controller controller : controllers) {
-            try {
-                controller.saveToDisk();
-            } catch (IOException e) {
-                Logging.LOG.log(Level.SEVERE, "Failed to save controller!", e);
-            }
+            controller.saveToDisk();
         }
     }
 
@@ -92,12 +91,14 @@ public class Controllers {
 
     public static void init() {
         if (initialized)
-            throw new IllegalStateException("Already initialized");
+            return;
 
         controllers.addAll(getControllersFromDisk());
         checkControllers();
 
         initialized = true;
+        CALLBACKS.forEach(callback -> Schedulers.androidUIThread().execute(callback));
+        CALLBACKS.clear();
     }
 
     private static ArrayList<Controller> getControllersFromDisk() {
@@ -111,10 +112,16 @@ public class Controllers {
                             .registerTypeAdapterFactory(new JavaFxPropertyTypeAdapterFactory(true, true))
                             .setPrettyPrinting()
                             .create().fromJson(str, Controller.class);
+                    if (controller == null) {
+                        throw new JsonParseException("Controller is null!");
+                    }
+                    if (!json.getName().equals(controller.getFileName())) {
+                        controller.renameFile(json.getName(), controller.getFileName());
+                    }
                     list.add(controller);
                 } catch (IOException e) {
                     Logging.LOG.log(Level.WARNING, "Can't read file: " + json.getAbsolutePath(), e.getMessage());
-                } catch (JsonSyntaxException e) {
+                } catch (JsonParseException e) {
                     Logging.LOG.log(Level.WARNING, "File: " + json.getAbsolutePath(), e.getMessage() + " is broken!");
                     json.renameTo(new File(FCLPath.CONTROLLER_DIR, json.getName() + ".bak"));
                 }
@@ -145,9 +152,17 @@ public class Controllers {
         controllers.remove(controller);
     }
 
-    public static Controller findControllerByName(String name) {
+    public static Controller findControllerById(String id) {
         checkControllers();
-        return controllers.stream().filter(it -> it.getName().equals(name)).findFirst().orElse(controllers.get(0));
+        return controllers.stream().filter(it -> it.getId().equals(id)).findFirst().orElse(controllers.get(0));
+    }
+
+    public static void addCallback(Runnable callback) {
+        if (initialized) {
+            callback.run();
+            return;
+        }
+        CALLBACKS.add(callback);
     }
 
 }
